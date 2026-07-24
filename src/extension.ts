@@ -3,6 +3,7 @@ import { scanDirectory, flattenFiles } from './scanner';
 import { detectStack } from './stackDetector';
 import { mapStructure } from './structureMapper';
 import { ProjectMap } from './types';
+import { ChatViewProvider } from './chatViewProvider';
 
 let cachedMap: ProjectMap | undefined;
 
@@ -22,11 +23,32 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('Project map built:', cachedMap.stack);
   }
 
+  const chatProvider = new ChatViewProvider(context.extensionUri, () => cachedMap, context.secrets);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider)
+  );
+
+  const setKeyDisposable = vscode.commands.registerCommand(
+    'codebase-architecture-assistant.setApiKey',
+    async () => {
+      const key = await vscode.window.showInputBox({
+        prompt: 'Enter your Anthropic API key (starts with sk-ant-)',
+        password: true,
+        ignoreFocusOut: true
+      });
+      if (key) {
+        await context.secrets.store('anthropicApiKey', key);
+        vscode.window.showInformationMessage('Claude API key saved securely.');
+      }
+    }
+  );
+  context.subscriptions.push(setKeyDisposable);
+
   const disposable = vscode.commands.registerCommand(
     'codebase-architecture-assistant.showMap',
     () => {
       if (!cachedMap) {
-        vscode.window.showInformationMessage('No project map yet — open a folder first.');
+        vscode.window.showInformationMessage('No project map yet - open a folder first.');
         return;
       }
       const { languages, frameworks } = cachedMap.stack;

@@ -15,9 +15,32 @@
     "commands": [
       {
         "command": "codebase-architecture-assistant.showMap",
-        "title": "Show project map"
+        "title": "Show Project Map"
+      },
+      {
+        "command": "codebase-architecture-assistant.setApiKey",
+        "title": "Codebase Assistant: Set Claude API Key"
       }
-    ]
+
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codebaseAssistant",
+          "title": "Codebase Assistant",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codebaseAssistant": [
+        {
+          "type": "webview",
+          "id": "codebaseAssistant.chatView",
+          "name": "Chat"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

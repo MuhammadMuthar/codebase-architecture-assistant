@@ -19,7 +19,7 @@
       },
       {
         "command": "codebase-architecture-assistant.setApiKey",
-        "title": "Codebase Assistant: Set Claude API Key"
+        "title": "Codebase Assistant: Set Groq API Key"
       }
 
     ],

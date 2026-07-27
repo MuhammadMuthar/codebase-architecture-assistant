@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { ProjectMap } from './types';
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = 'openai/gpt-oss-120b';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'codebaseAssistant.chatView';
@@ -36,21 +36,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      const apiKey = await this.secrets.get('anthropicApiKey');
+      const apiKey = await this.secrets.get('groqApiKey');
       if (!apiKey) {
         webviewView.webview.postMessage({
           type: 'answer',
-          text: 'No Claude API key set yet. Run "Codebase Assistant: Set Claude API Key" from the Command Palette first.'
+          text: 'No Groq API key set yet. Run "Codebase Assistant: Set Groq API Key" from the Command Palette first.'
         });
         return;
       }
 
       try {
-        const answer = await askClaude(message.text, map, apiKey);
+        const answer = await askGroq(message.text, map, apiKey);
         webviewView.webview.postMessage({ type: 'answer', text: answer });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        webviewView.webview.postMessage({ type: 'answer', text: `Error calling Claude API: ${msg}` });
+        webviewView.webview.postMessage({ type: 'answer', text: `Error calling Groq API: ${msg}` });
       }
     });
   }
@@ -213,7 +213,7 @@ function buildContextString(map: ProjectMap): string {
   ].join('\n');
 }
 
-async function askClaude(question: string, map: ProjectMap, apiKey: string): Promise<string> {
+async function askGroq(question: string, map: ProjectMap, apiKey: string): Promise<string> {
   const systemPrompt = [
     'You are a codebase architecture assistant embedded in VS Code.',
     "Help the developer understand this specific project's structure and technology choices.",
@@ -222,18 +222,19 @@ async function askClaude(question: string, map: ProjectMap, apiKey: string): Pro
     buildContextString(map)
   ].join('\n');
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
+      authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 800,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: question }]
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: question }
+      ]
     })
   });
 
@@ -243,8 +244,8 @@ async function askClaude(question: string, map: ProjectMap, apiKey: string): Pro
   }
 
   const data: any = await response.json();
-  const textBlock = (data.content || []).find((block: any) => block.type === 'text');
-  return textBlock?.text ?? '(no text in response)';
+  const text = data.choices?.[0]?.message?.content;
+  return text ?? '(no text in response)';
 }
 
 function getNonce(): string {

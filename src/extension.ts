@@ -32,13 +32,13 @@ export function activate(context: vscode.ExtensionContext) {
     'codebase-architecture-assistant.setApiKey',
     async () => {
       const key = await vscode.window.showInputBox({
-        prompt: 'Enter your Anthropic API key (starts with sk-ant-)',
+        prompt: 'Enter your Groq API key (starts with gsk_)',
         password: true,
         ignoreFocusOut: true
       });
       if (key) {
-        await context.secrets.store('anthropicApiKey', key);
-        vscode.window.showInformationMessage('Claude API key saved securely.');
+        await context.secrets.store('groqApiKey', key.trim());
+        vscode.window.showInformationMessage('Groq API key saved securely.');
       }
     }
   );

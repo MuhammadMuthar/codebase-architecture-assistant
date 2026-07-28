@@ -1,11 +1,29 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { StackInfo } from './types';
+import { StackInfo, FileEntry } from './types';
 
 const SUBFOLDER_CANDIDATES = [
   'backend', 'server', 'api',
   'frontend', 'client', 'web'
 ];
+
+// Used only as a fallback when no manifest file (package.json, requirements.txt,
+// etc.) was found anywhere - i.e. plain static-site style projects with no
+// build tooling at all.
+const EXT_LANGUAGE_MAP: Record<string, string> = {
+  '.html': 'HTML',
+  '.htm': 'HTML',
+  '.css': 'CSS',
+  '.scss': 'Sass',
+  '.sass': 'Sass',
+  '.less': 'Less',
+  '.js': 'JavaScript',
+  '.mjs': 'JavaScript',
+  '.cjs': 'JavaScript',
+  '.jsx': 'JavaScript (JSX)',
+  '.ts': 'TypeScript',
+  '.tsx': 'TypeScript (TSX)'
+};
 
 function readJSONSafe(filePath: string): any | null {
   try {
@@ -103,7 +121,38 @@ function detectAt(
   return found;
 }
 
-export function detectStack(rootPath: string): StackInfo {
+/**
+ * Fallback for projects with no recognizable manifest file at all - e.g. a
+ * plain static site made of hand-written HTML/CSS/JS with no build tooling.
+ * Scans file extensions across the already-collected file list instead of
+ * assuming "no manifest" means "stack unknown".
+ */
+function detectFromFileExtensions(files: FileEntry[]): {
+  languages: string[];
+  isStaticSite: boolean;
+} {
+  const languages = new Set<string>();
+  let hasHtml = false;
+  let hasCss = false;
+  let hasJs = false;
+
+  for (const file of files) {
+    const lang = EXT_LANGUAGE_MAP[file.ext.toLowerCase()];
+    if (!lang) continue;
+    languages.add(lang);
+    if (lang === 'HTML') hasHtml = true;
+    if (lang === 'CSS' || lang === 'Sass' || lang === 'Less') hasCss = true;
+    if (lang === 'JavaScript' || lang === 'JavaScript (JSX)') hasJs = true;
+  }
+
+  // "Static site" here means: it looks like a browser-facing project
+  // (at least an HTML entry point) with no build tooling behind it.
+  const isStaticSite = hasHtml && (hasCss || hasJs);
+
+  return { languages: Array.from(languages), isStaticSite };
+}
+
+export function detectStack(rootPath: string, allFiles: FileEntry[] = []): StackInfo {
   const languages = new Set<string>();
   const frameworks = new Set<string>();
   const packageManagers = new Set<string>();
@@ -120,7 +169,23 @@ export function detectStack(rootPath: string): StackInfo {
   }
 
   if (!rootFound && subfoldersFound.length === 0) {
-    notes.push('No standard manifest file found at project root or common subfolders - stack detection may be incomplete.');
+    const { languages: extLanguages, isStaticSite } = detectFromFileExtensions(allFiles);
+    if (extLanguages.length > 0) {
+      extLanguages.forEach(l => languages.add(l));
+      if (isStaticSite) {
+        notes.push(
+          'No package manager or framework manifest found - detected as a plain ' +
+          'static site (hand-written HTML/CSS/JS) based on file extensions, with no build tooling.'
+        );
+      } else {
+        notes.push(
+          'No package manager or framework manifest found - languages below were ' +
+          'inferred from file extensions only, so this reading may be incomplete.'
+        );
+      }
+    } else {
+      notes.push('No standard manifest file found at project root or common subfolders - stack detection may be incomplete.');
+    }
   } else if (subfoldersFound.length > 0) {
     notes.push('Monorepo detected - stack info also pulled from: ' + subfoldersFound.join(', '));
   }

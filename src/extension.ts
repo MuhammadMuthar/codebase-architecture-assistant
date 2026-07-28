@@ -9,10 +9,10 @@ let cachedMap: ProjectMap | undefined;
 
 function buildProjectMap(rootPath: string): ProjectMap {
   const tree = scanDirectory(rootPath);
-  const stack = detectStack(rootPath);
+  const allFiles = flattenFiles(tree);
+  const stack = detectStack(rootPath, allFiles);
   const structure = mapStructure(tree);
-  const totalFiles = flattenFiles(tree).length;
-  return { root: rootPath, stack, structure, fileTree: tree, totalFiles };
+  return { root: rootPath, stack, structure, fileTree: tree, totalFiles: allFiles.length };
 }
 
 export function activate(context: vscode.ExtensionContext) {

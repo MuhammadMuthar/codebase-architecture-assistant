@@ -5,8 +5,16 @@ const MODEL = 'openai/gpt-oss-120b';
 
 // URL of your own proxy server that holds the real Groq key server-side
 // and enforces the free-tier quota. See proxy/README.md for how to deploy one.
-const PROXY_URL = 'https://codebase-assistant-proxy.muthar-dev.workers.dev/';
+const PROXY_URL = 'https://codebase-assistant-proxy.muthar-dev.workers.dev/chat';
 const FREE_QUESTION_LIMIT = 20;
+
+const HISTORY_KEY = 'chatHistory';
+const MAX_HISTORY_MESSAGES = 100; // keep workspaceState + payload size bounded
+
+interface ChatHistoryEntry {
+  sender: 'user' | 'assistant';
+  text: string;
+}
 
 export class QuotaExceededError extends Error {
   constructor() {
@@ -25,8 +33,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly getProjectMap: () => ProjectMap | undefined,
     private readonly secrets: vscode.SecretStorage,
     private readonly globalState: vscode.Memento,
+    private readonly workspaceState: vscode.Memento,
     private readonly machineId: string
   ) {}
+
+  private getHistory(): ChatHistoryEntry[] {
+    return this.workspaceState.get<ChatHistoryEntry[]>(HISTORY_KEY, []);
+  }
+
+  private async appendToHistory(entry: ChatHistoryEntry): Promise<void> {
+    const history = this.getHistory();
+    history.push(entry);
+    const trimmed = history.length > MAX_HISTORY_MESSAGES
+      ? history.slice(history.length - MAX_HISTORY_MESSAGES)
+      : history;
+    await this.workspaceState.update(HISTORY_KEY, trimmed);
+  }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
@@ -39,6 +61,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(async (message: { type: string; text: string }) => {
+      if (message.type === 'ready') {
+        webviewView.webview.postMessage({ type: 'restoreHistory', history: this.getHistory() });
+        return;
+      }
+
+      if (message.type === 'clearHistory') {
+        await this.workspaceState.update(HISTORY_KEY, []);
+        return;
+      }
+
       if (message.type === 'setKey') {
         await vscode.commands.executeCommand('codebase-architecture-assistant.setApiKey');
         return;
@@ -48,21 +80,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       const map = this.getProjectMap();
       if (!map) {
-        webviewView.webview.postMessage({
-          type: 'answer',
-          text: "I don't have a project map yet - open a folder first."
-        });
+        const text = "I don't have a project map yet - open a folder first.";
+        webviewView.webview.postMessage({ type: 'answer', text });
         return;
       }
+
+      await this.appendToHistory({ sender: 'user', text: message.text });
 
       const apiKey = await this.secrets.get('groqApiKey');
 
       try {
         if (apiKey) {
           const answer = await askGroq(message.text, map, apiKey);
+          await this.appendToHistory({ sender: 'assistant', text: answer });
           webviewView.webview.postMessage({ type: 'answer', text: answer });
         } else {
           const { text, remaining } = await this.askViaFreeTier(message.text, map);
+          await this.appendToHistory({ sender: 'assistant', text });
           webviewView.webview.postMessage({ type: 'answer', text, freeRemaining: remaining });
         }
       } catch (err) {
@@ -242,10 +276,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
   #quota-hint.low {
     color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+  }  #header-row {
+    display: flex;
+    justify-content: flex-end;
+    padding: 6px 8px 0 8px;
+  }
+  #header-row button {
+    background: transparent;
+    color: var(--vscode-descriptionForeground);
+    border: 1px solid var(--vscode-panel-border);
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+  #header-row button:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--vscode-editorWidget-background));
+    color: var(--vscode-foreground);
   }
 </style>
 </head>
 <body>
+<div id="header-row">
+  <button id="clear" title="Clear chat history">Clear chat</button>
+</div>
 <div id="messages">
   <div class="empty-state" id="empty-state">Ask a question about this project.</div>
 </div>
@@ -261,6 +313,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   const messagesEl = document.getElementById('messages');
   const questionEl = document.getElementById('question');
   const sendBtn = document.getElementById('send');
+  const clearBtn = document.getElementById('clear');
   const emptyStateEl = document.getElementById('empty-state');
   const quotaHintEl = document.getElementById('quota-hint');
   let thinkingEl = null;
@@ -329,6 +382,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   });
 
+  clearBtn.addEventListener('click', () => {
+    messagesEl.innerHTML = '';
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.id = 'empty-state';
+    empty.textContent = 'Ask a question about this project.';
+    messagesEl.appendChild(empty);
+    vscode.postMessage({ type: 'clearHistory' });
+  });
+
+  function restoreHistory(history) {
+    if (!Array.isArray(history) || history.length === 0) return;
+    const empty = document.getElementById('empty-state');
+    if (empty) empty.remove();
+    for (const entry of history) {
+      if (entry.sender === 'user') {
+        addMessage(entry.text, 'user');
+      } else {
+        const formattedHtml = DOMPurify.sanitize(marked.parse(entry.text));
+        addMessage(formattedHtml, 'assistant', true);
+      }
+    }
+  }
+
   window.addEventListener('message', (event) => {
     const message = event.data;
     if (message.type === 'answer') {
@@ -351,8 +428,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       addQuotaExceededMessage(message.text);
       updateQuotaHint(0);
+    } else if (message.type === 'restoreHistory') {
+      restoreHistory(message.history);
     }
   });
+
+  // Tell the extension host we're ready to receive persisted history.
+  vscode.postMessage({ type: 'ready' });
 </script>
   </body>
 </html>`;

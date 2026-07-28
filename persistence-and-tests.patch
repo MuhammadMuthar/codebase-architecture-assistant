@@ -1,0 +1,523 @@
+diff --git a/package.json b/package.json
+index a47dbe5..768dbda 100644
+--- a/package.json
++++ b/package.json
+@@ -25,6 +25,7 @@
+         "command": "codebase-architecture-assistant.clearApiKey",
+         "title": "Codebase Assistant: Clear Groq API Key"
+       }
++
+     ],
+     "viewsContainers": {
+       "activitybar": [
+@@ -51,7 +52,8 @@
+     "watch": "tsc -watch -p ./",
+     "pretest": "npm run compile && npm run lint",
+     "lint": "eslint src",
+-    "test": "vscode-test"
++    "test": "vscode-test",
++    "test:unit": "tsc -p ./ && node --test out/unit-tests/*.test.js"
+   },
+   "devDependencies": {
+     "@types/vscode": "^1.103.0",
+diff --git a/src/chatViewProvider.ts b/src/chatViewProvider.ts
+index 706d179..4a91ff7 100644
+--- a/src/chatViewProvider.ts
++++ b/src/chatViewProvider.ts
+@@ -8,6 +8,14 @@ const MODEL = 'openai/gpt-oss-120b';
+ const PROXY_URL = 'https://codebase-assistant-proxy.muthar-dev.workers.dev/chat';
+ const FREE_QUESTION_LIMIT = 20;
+ 
++const HISTORY_KEY = 'chatHistory';
++const MAX_HISTORY_MESSAGES = 100; // keep workspaceState + payload size bounded
++
++interface ChatHistoryEntry {
++  sender: 'user' | 'assistant';
++  text: string;
++}
++
+ export class QuotaExceededError extends Error {
+   constructor() {
+     super('Free question quota exceeded');
+@@ -25,9 +33,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+     private readonly getProjectMap: () => ProjectMap | undefined,
+     private readonly secrets: vscode.SecretStorage,
+     private readonly globalState: vscode.Memento,
++    private readonly workspaceState: vscode.Memento,
+     private readonly machineId: string
+   ) {}
+ 
++  private getHistory(): ChatHistoryEntry[] {
++    return this.workspaceState.get<ChatHistoryEntry[]>(HISTORY_KEY, []);
++  }
++
++  private async appendToHistory(entry: ChatHistoryEntry): Promise<void> {
++    const history = this.getHistory();
++    history.push(entry);
++    const trimmed = history.length > MAX_HISTORY_MESSAGES
++      ? history.slice(history.length - MAX_HISTORY_MESSAGES)
++      : history;
++    await this.workspaceState.update(HISTORY_KEY, trimmed);
++  }
++
+   resolveWebviewView(webviewView: vscode.WebviewView): void {
+     this.view = webviewView;
+ 
+@@ -39,6 +61,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+     webviewView.webview.html = this.getHtml(webviewView.webview);
+ 
+     webviewView.webview.onDidReceiveMessage(async (message: { type: string; text: string }) => {
++      if (message.type === 'ready') {
++        webviewView.webview.postMessage({ type: 'restoreHistory', history: this.getHistory() });
++        return;
++      }
++
++      if (message.type === 'clearHistory') {
++        await this.workspaceState.update(HISTORY_KEY, []);
++        return;
++      }
++
+       if (message.type === 'setKey') {
+         await vscode.commands.executeCommand('codebase-architecture-assistant.setApiKey');
+         return;
+@@ -48,21 +80,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+ 
+       const map = this.getProjectMap();
+       if (!map) {
+-        webviewView.webview.postMessage({
+-          type: 'answer',
+-          text: "I don't have a project map yet - open a folder first."
+-        });
++        const text = "I don't have a project map yet - open a folder first.";
++        webviewView.webview.postMessage({ type: 'answer', text });
+         return;
+       }
+ 
++      await this.appendToHistory({ sender: 'user', text: message.text });
++
+       const apiKey = await this.secrets.get('groqApiKey');
+ 
+       try {
+         if (apiKey) {
+           const answer = await askGroq(message.text, map, apiKey);
++          await this.appendToHistory({ sender: 'assistant', text: answer });
+           webviewView.webview.postMessage({ type: 'answer', text: answer });
+         } else {
+           const { text, remaining } = await this.askViaFreeTier(message.text, map);
++          await this.appendToHistory({ sender: 'assistant', text });
+           webviewView.webview.postMessage({ type: 'answer', text, freeRemaining: remaining });
+         }
+       } catch (err) {
+@@ -242,10 +276,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+   }
+   #quota-hint.low {
+     color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
++  }  #header-row {
++    display: flex;
++    justify-content: flex-end;
++    padding: 6px 8px 0 8px;
++  }
++  #header-row button {
++    background: transparent;
++    color: var(--vscode-descriptionForeground);
++    border: 1px solid var(--vscode-panel-border);
++    padding: 2px 8px;
++    font-size: 11px;
++  }
++  #header-row button:hover {
++    background: var(--vscode-toolbar-hoverBackground, var(--vscode-editorWidget-background));
++    color: var(--vscode-foreground);
+   }
+ </style>
+ </head>
+ <body>
++<div id="header-row">
++  <button id="clear" title="Clear chat history">Clear chat</button>
++</div>
+ <div id="messages">
+   <div class="empty-state" id="empty-state">Ask a question about this project.</div>
+ </div>
+@@ -261,6 +313,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+   const messagesEl = document.getElementById('messages');
+   const questionEl = document.getElementById('question');
+   const sendBtn = document.getElementById('send');
++  const clearBtn = document.getElementById('clear');
+   const emptyStateEl = document.getElementById('empty-state');
+   const quotaHintEl = document.getElementById('quota-hint');
+   let thinkingEl = null;
+@@ -329,6 +382,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+     }
+   });
+ 
++  clearBtn.addEventListener('click', () => {
++    messagesEl.innerHTML = '';
++    const empty = document.createElement('div');
++    empty.className = 'empty-state';
++    empty.id = 'empty-state';
++    empty.textContent = 'Ask a question about this project.';
++    messagesEl.appendChild(empty);
++    vscode.postMessage({ type: 'clearHistory' });
++  });
++
++  function restoreHistory(history) {
++    if (!Array.isArray(history) || history.length === 0) return;
++    const empty = document.getElementById('empty-state');
++    if (empty) empty.remove();
++    for (const entry of history) {
++      if (entry.sender === 'user') {
++        addMessage(entry.text, 'user');
++      } else {
++        const formattedHtml = DOMPurify.sanitize(marked.parse(entry.text));
++        addMessage(formattedHtml, 'assistant', true);
++      }
++    }
++  }
++
+   window.addEventListener('message', (event) => {
+     const message = event.data;
+     if (message.type === 'answer') {
+@@ -351,8 +428,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+       }
+       addQuotaExceededMessage(message.text);
+       updateQuotaHint(0);
++    } else if (message.type === 'restoreHistory') {
++      restoreHistory(message.history);
+     }
+   });
++
++  // Tell the extension host we're ready to receive persisted history.
++  vscode.postMessage({ type: 'ready' });
+ </script>
+   </body>
+ </html>`;
+diff --git a/src/extension.ts b/src/extension.ts
+index 2194d3f..7518bb0 100644
+--- a/src/extension.ts
++++ b/src/extension.ts
+@@ -28,6 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
+     () => cachedMap,
+     context.secrets,
+     context.globalState,
++    context.workspaceState,
+     vscode.env.machineId
+   );
+   context.subscriptions.push(
+diff --git a/src/unit-tests/scanner.test.ts b/src/unit-tests/scanner.test.ts
+new file mode 100644
+index 0000000..33ca6f1
+--- /dev/null
++++ b/src/unit-tests/scanner.test.ts
+@@ -0,0 +1,70 @@
++import { test, describe, before, after } from 'node:test';
++import assert from 'node:assert/strict';
++import * as fs from 'fs';
++import * as path from 'path';
++import * as os from 'os';
++import { scanDirectory, flattenFiles } from '../scanner';
++
++describe('scanner', () => {
++  let tmpDir: string;
++
++  before(() => {
++    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'scanner-test-'));
++
++    // A normal source file at the root.
++    fs.writeFileSync(path.join(tmpDir, 'index.js'), 'console.log(1);');
++
++    // A nested folder that should be walked.
++    fs.mkdirSync(path.join(tmpDir, 'src'));
++    fs.writeFileSync(path.join(tmpDir, 'src', 'app.ts'), 'export {};');
++    fs.writeFileSync(path.join(tmpDir, 'src', 'app.test.ts'), 'export {};');
++
++    // Folders that should be ignored entirely.
++    fs.mkdirSync(path.join(tmpDir, 'node_modules', 'some-pkg'), { recursive: true });
++    fs.writeFileSync(path.join(tmpDir, 'node_modules', 'some-pkg', 'index.js'), '// dep');
++
++    fs.mkdirSync(path.join(tmpDir, '.git'));
++    fs.writeFileSync(path.join(tmpDir, '.git', 'HEAD'), 'ref: refs/heads/main');
++
++    fs.mkdirSync(path.join(tmpDir, 'dist'));
++    fs.writeFileSync(path.join(tmpDir, 'dist', 'bundle.js'), '// built output');
++  });
++
++  after(() => {
++    fs.rmSync(tmpDir, { recursive: true, force: true });
++  });
++
++  test('walks nested folders and includes files at every level', () => {
++    const tree = scanDirectory(tmpDir);
++    const files = flattenFiles(tree);
++    const names = files.map(f => f.name).sort();
++
++    assert.deepEqual(names, ['app.test.ts', 'app.ts', 'index.js']);
++  });
++
++  test('skips node_modules, dotfolders, and build output directories', () => {
++    const tree = scanDirectory(tmpDir);
++    const files = flattenFiles(tree);
++    const paths = files.map(f => f.path);
++
++    assert.ok(!paths.some(p => p.includes('node_modules')));
++    assert.ok(!paths.some(p => p.includes('.git')));
++    assert.ok(!paths.some(p => p.includes('dist')));
++  });
++
++  test('records correct extension and relative path for nested files', () => {
++    const tree = scanDirectory(tmpDir);
++    const files = flattenFiles(tree);
++    const appTs = files.find(f => f.name === 'app.ts');
++
++    assert.ok(appTs, 'expected to find src/app.ts');
++    assert.equal(appTs!.ext, '.ts');
++    assert.equal(appTs!.path, path.join('src', 'app.ts'));
++  });
++
++  test('root DirEntry uses the folder name and empty relative path', () => {
++    const tree = scanDirectory(tmpDir);
++    assert.equal(tree.path, '.');
++    assert.equal(tree.name, path.basename(tmpDir));
++  });
++});
+diff --git a/src/unit-tests/stackDetector.test.ts b/src/unit-tests/stackDetector.test.ts
+new file mode 100644
+index 0000000..5972370
+--- /dev/null
++++ b/src/unit-tests/stackDetector.test.ts
+@@ -0,0 +1,138 @@
++import { test, describe, before, after } from 'node:test';
++import assert from 'node:assert/strict';
++import * as fs from 'fs';
++import * as path from 'path';
++import * as os from 'os';
++import { detectStack } from '../stackDetector';
++import { scanDirectory, flattenFiles } from '../scanner';
++
++function makeTmpDir(prefix: string): string {
++  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
++}
++
++describe('stackDetector - manifest-based detection', () => {
++  let tmpDir: string;
++
++  before(() => {
++    tmpDir = makeTmpDir('stack-react-');
++    fs.writeFileSync(
++      path.join(tmpDir, 'package.json'),
++      JSON.stringify({ name: 'test', dependencies: { react: '^18.0.0' } })
++    );
++  });
++
++  after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
++
++  test('detects React + npm from package.json and adds no warning notes', () => {
++    const stack = detectStack(tmpDir);
++    assert.ok(stack.languages.includes('JavaScript'));
++    assert.ok(stack.frameworks.includes('React'));
++    assert.ok(stack.packageManagers.includes('npm'));
++    assert.deepEqual(stack.notes, []);
++  });
++
++  test('detects TypeScript when tsconfig.json is present alongside package.json', () => {
++    fs.writeFileSync(path.join(tmpDir, 'tsconfig.json'), '{}');
++    const stack = detectStack(tmpDir);
++    assert.ok(stack.languages.includes('TypeScript'));
++  });
++});
++
++describe('stackDetector - Python manifest detection', () => {
++  let tmpDir: string;
++
++  before(() => {
++    tmpDir = makeTmpDir('stack-python-');
++    fs.writeFileSync(path.join(tmpDir, 'requirements.txt'), 'Django==4.2\ngunicorn==21.0');
++  });
++
++  after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
++
++  test('detects Django from requirements.txt', () => {
++    const stack = detectStack(tmpDir);
++    assert.ok(stack.languages.includes('Python'));
++    assert.ok(stack.frameworks.includes('Django'));
++    assert.ok(stack.packageManagers.includes('pip'));
++  });
++});
++
++describe('stackDetector - plain static site fallback (no manifest)', () => {
++  let tmpDir: string;
++
++  before(() => {
++    tmpDir = makeTmpDir('stack-static-');
++    fs.writeFileSync(path.join(tmpDir, 'index.html'), '<html></html>');
++    fs.writeFileSync(path.join(tmpDir, 'style.css'), 'body {}');
++    fs.writeFileSync(path.join(tmpDir, 'script.js'), 'console.log(1);');
++  });
++
++  after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
++
++  test('falls back to extension-based detection and reports HTML/CSS/JavaScript', () => {
++    const tree = scanDirectory(tmpDir);
++    const files = flattenFiles(tree);
++    const stack = detectStack(tmpDir, files);
++
++    assert.ok(stack.languages.includes('HTML'));
++    assert.ok(stack.languages.includes('CSS'));
++    assert.ok(stack.languages.includes('JavaScript'));
++    assert.equal(stack.frameworks.length, 0);
++    assert.equal(stack.packageManagers.length, 0);
++    assert.ok(stack.notes.some(n => n.toLowerCase().includes('static site')));
++  });
++
++  test('without a files argument, falls back to the generic "incomplete" note', () => {
++    // Simulates a caller that forgets to pass the scanned file list.
++    const stack = detectStack(tmpDir);
++    assert.deepEqual(stack.languages, []);
++    assert.ok(stack.notes.some(n => n.includes('may be incomplete')));
++  });
++});
++
++describe('stackDetector - truly unknown project', () => {
++  let tmpDir: string;
++
++  before(() => {
++    tmpDir = makeTmpDir('stack-unknown-');
++    fs.writeFileSync(path.join(tmpDir, 'README.md'), '# Just a readme');
++  });
++
++  after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
++
++  test('reports empty stack and an "incomplete" note when nothing is recognizable', () => {
++    const tree = scanDirectory(tmpDir);
++    const files = flattenFiles(tree);
++    const stack = detectStack(tmpDir, files);
++
++    assert.deepEqual(stack.languages, []);
++    assert.deepEqual(stack.frameworks, []);
++    assert.ok(stack.notes.some(n => n.includes('No standard manifest file found')));
++  });
++});
++
++describe('stackDetector - monorepo across known subfolders', () => {
++  let tmpDir: string;
++
++  before(() => {
++    tmpDir = makeTmpDir('stack-monorepo-');
++    fs.mkdirSync(path.join(tmpDir, 'backend'));
++    fs.writeFileSync(
++      path.join(tmpDir, 'backend', 'package.json'),
++      JSON.stringify({ name: 'api', dependencies: { express: '^4.0.0' } })
++    );
++    fs.mkdirSync(path.join(tmpDir, 'frontend'));
++    fs.writeFileSync(
++      path.join(tmpDir, 'frontend', 'package.json'),
++      JSON.stringify({ name: 'web', dependencies: { react: '^18.0.0' } })
++    );
++  });
++
++  after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
++
++  test('pulls stack info from recognized subfolders and notes it as a monorepo', () => {
++    const stack = detectStack(tmpDir);
++    assert.ok(stack.frameworks.includes('Express'));
++    assert.ok(stack.frameworks.includes('React'));
++    assert.ok(stack.notes.some(n => n.includes('Monorepo detected')));
++  });
++});
+diff --git a/src/unit-tests/structureMapper.test.ts b/src/unit-tests/structureMapper.test.ts
+new file mode 100644
+index 0000000..1ccf629
+--- /dev/null
++++ b/src/unit-tests/structureMapper.test.ts
+@@ -0,0 +1,93 @@
++import { test, describe } from 'node:test';
++import assert from 'node:assert/strict';
++import { mapStructure } from '../structureMapper';
++import { DirEntry, FileEntry } from '../types';
++
++function file(name: string, relPath: string): FileEntry {
++  return { path: relPath, name, ext: '.' + name.split('.').pop(), size: 10 };
++}
++
++function dir(name: string, relPath: string, children: (DirEntry | FileEntry)[]): DirEntry {
++  return { path: relPath, name, children };
++}
++
++describe('structureMapper', () => {
++  test('classifies known folder names into their expected roles', () => {
++    const tree = dir('root', '.', [
++      dir('components', 'components', [file('Button.tsx', 'components/Button.tsx')]),
++      dir('routes', 'routes', [file('users.ts', 'routes/users.ts')]),
++      dir('models', 'models', [file('User.ts', 'models/User.ts')]),
++      dir('utils', 'utils', [file('format.ts', 'utils/format.ts')])
++    ]);
++
++    const roles = mapStructure(tree);
++    const roleByPath = Object.fromEntries(roles.map(r => [r.path, r.role]));
++
++    assert.equal(roleByPath['components'], 'UI / Presentation layer');
++    assert.equal(roleByPath['routes'], 'Routing / API layer');
++    assert.equal(roleByPath['models'], 'Data models');
++    assert.equal(roleByPath['utils'], 'Utilities');
++  });
++
++  test('classification is case-insensitive', () => {
++    const tree = dir('root', '.', [
++      dir('Components', 'Components', [])
++    ]);
++    const roles = mapStructure(tree);
++    assert.equal(roles[0].role, 'UI / Presentation layer');
++  });
++
++  test('ignores folders that do not match any known role', () => {
++    const tree = dir('root', '.', [
++      dir('some-random-folder', 'some-random-folder', [file('a.ts', 'some-random-folder/a.ts')])
++    ]);
++    const roles = mapStructure(tree);
++    assert.equal(roles.length, 0);
++  });
++
++  test('fileCount includes files from nested subfolders, not just direct children', () => {
++    const tree = dir('root', '.', [
++      dir('services', 'services', [
++        file('a.ts', 'services/a.ts'),
++        dir('nested', 'services/nested', [
++          file('b.ts', 'services/nested/b.ts'),
++          file('c.ts', 'services/nested/c.ts')
++        ])
++      ])
++    ]);
++    const roles = mapStructure(tree);
++    assert.equal(roles[0].role, 'Business logic / services');
++    assert.equal(roles[0].fileCount, 3);
++  });
++
++  test('sampleFiles only includes direct-child files, capped at 3, in original order', () => {
++    const tree = dir('root', '.', [
++      dir('utils', 'utils', [
++        file('a.ts', 'utils/a.ts'),
++        file('b.ts', 'utils/b.ts'),
++        file('c.ts', 'utils/c.ts'),
++        file('d.ts', 'utils/d.ts')
++      ])
++    ]);
++    const roles = mapStructure(tree);
++    assert.deepEqual(roles[0].sampleFiles, ['a.ts', 'b.ts', 'c.ts']);
++  });
++
++  test('recurses into matched folders to find further matches beneath them', () => {
++    const tree = dir('root', '.', [
++      dir('src', 'src', [
++        dir('components', 'src/components', [file('Card.tsx', 'src/components/Card.tsx')]),
++        dir('services', 'src/services', [file('api.ts', 'src/services/api.ts')])
++      ])
++    ]);
++    const roles = mapStructure(tree);
++    const paths = roles.map(r => r.path).sort();
++    assert.deepEqual(paths, ['src/components', 'src/services']);
++  });
++
++  test('returns an empty array for a tree with no recognizable folders at all', () => {
++    const tree = dir('root', '.', [file('index.js', 'index.js')]);
++    const roles = mapStructure(tree);
++    assert.deepEqual(roles, []);
++  });
++});

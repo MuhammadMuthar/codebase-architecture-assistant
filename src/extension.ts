@@ -28,6 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
     () => cachedMap,
     context.secrets,
     context.globalState,
+    context.workspaceState,
     vscode.env.machineId
   );
   context.subscriptions.push(

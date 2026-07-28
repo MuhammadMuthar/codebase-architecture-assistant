@@ -6,7 +6,7 @@ compatibility_date = "2024-01-01"
 #   npx wrangler kv namespace create QUOTA
 # then paste the returned id below.
 kv_namespaces = [
-  { binding = "QUOTA", id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID" }
+  { binding = "QUOTA", id = "48e74b8fc7f3451eae37154dc97b58e3" }
 ]
 
 [vars]

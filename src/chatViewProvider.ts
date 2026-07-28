@@ -5,7 +5,7 @@ const MODEL = 'openai/gpt-oss-120b';
 
 // URL of your own proxy server that holds the real Groq key server-side
 // and enforces the free-tier quota. See proxy/README.md for how to deploy one.
-const PROXY_URL = 'https://your-proxy.example.workers.dev/chat';
+const PROXY_URL = 'https://codebase-assistant-proxy.muthar-dev.workers.dev/';
 const FREE_QUESTION_LIMIT = 20;
 
 export class QuotaExceededError extends Error {

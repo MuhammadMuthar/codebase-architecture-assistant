@@ -1,0 +1,145 @@
+diff --git a/package.json b/package.json
+index bb1d1ac..da82fc5 100644
+--- a/package.json
++++ b/package.json
+@@ -20,6 +20,10 @@
+       {
+         "command": "codebase-architecture-assistant.setApiKey",
+         "title": "Codebase Assistant: Set Groq API Key"
++      },
++      {
++        "command": "codebase-architecture-assistant.clearApiKey",
++        "title": "Codebase Assistant: Clear Groq API Key"
+       }
+ 
+     ],
+diff --git a/src/chatViewProvider.ts b/src/chatViewProvider.ts
+index 5af0741..706d179 100644
+--- a/src/chatViewProvider.ts
++++ b/src/chatViewProvider.ts
+@@ -58,10 +58,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+       const apiKey = await this.secrets.get('groqApiKey');
+ 
+       try {
+-        const answer = apiKey
+-          ? await askGroq(message.text, map, apiKey)
+-          : await this.askViaFreeTier(message.text, map);
+-        webviewView.webview.postMessage({ type: 'answer', text: answer });
++        if (apiKey) {
++          const answer = await askGroq(message.text, map, apiKey);
++          webviewView.webview.postMessage({ type: 'answer', text: answer });
++        } else {
++          const { text, remaining } = await this.askViaFreeTier(message.text, map);
++          webviewView.webview.postMessage({ type: 'answer', text, freeRemaining: remaining });
++        }
+       } catch (err) {
+         if (err instanceof QuotaExceededError) {
+           webviewView.webview.postMessage({
+@@ -83,7 +86,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+    * counter below is only used to show a friendly "x of 20 left" hint and
+    * to avoid a wasted network round-trip once we already know it's spent.
+    */
+-  private async askViaFreeTier(question: string, map: ProjectMap): Promise<string> {
++  private async askViaFreeTier(question: string, map: ProjectMap): Promise<{ text: string; remaining: number }> {
+     const used = this.globalState.get<number>('freeQuestionsUsed', 0);
+     if (used >= FREE_QUESTION_LIMIT) {
+       throw new QuotaExceededError();
+@@ -107,7 +110,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+ 
+     await this.globalState.update('freeQuestionsUsed', used + 1);
+     const data: any = await response.json();
+-    return data.text ?? '(no text in response)';
++    const remaining = typeof data.remaining === 'number'
++      ? data.remaining
++      : Math.max(0, FREE_QUESTION_LIMIT - (used + 1));
++    return { text: data.text ?? '(no text in response)', remaining };
+   }
+ 
+   private getHtml(webview: vscode.Webview): string {
+@@ -224,12 +230,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+     margin: 6px 0;
+     padding-left: 20px;
+   }
++  #quota-hint {
++    display: none;
++    font-size: 11px;
++    color: var(--vscode-descriptionForeground);
++    padding: 4px 8px 0 8px;
++    text-align: right;
++  }
++  #quota-hint.visible {
++    display: block;
++  }
++  #quota-hint.low {
++    color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
++  }
+ </style>
+ </head>
+ <body>
+ <div id="messages">
+   <div class="empty-state" id="empty-state">Ask a question about this project.</div>
+ </div>
++<div id="quota-hint"></div>
+ <div id="input-row">
+   <textarea id="question" rows="2" placeholder="Ask about this codebase..."></textarea>
+   <button id="send">Send</button>
+@@ -242,8 +262,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+   const questionEl = document.getElementById('question');
+   const sendBtn = document.getElementById('send');
+   const emptyStateEl = document.getElementById('empty-state');
++  const quotaHintEl = document.getElementById('quota-hint');
+   let thinkingEl = null;
+ 
++  function updateQuotaHint(remaining) {
++    if (typeof remaining !== 'number') return;
++    quotaHintEl.textContent = remaining === 0
++      ? 'No free questions left - set your own Groq API key to continue.'
++      : remaining + ' free question' + (remaining === 1 ? '' : 's') + ' remaining';
++    quotaHintEl.classList.add('visible');
++    quotaHintEl.classList.toggle('low', remaining <= 3);
++  }
++
+   function clearEmptyState() {
+     if (emptyStateEl && emptyStateEl.parentNode) {
+       emptyStateEl.parentNode.removeChild(emptyStateEl);
+@@ -312,12 +342,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+       } else {
+         addMessage(formattedHtml, 'assistant', true);
+       }
++
++      updateQuotaHint(message.freeRemaining);
+     } else if (message.type === 'quotaExceeded') {
+       if (thinkingEl) {
+         thinkingEl.remove();
+         thinkingEl = null;
+       }
+       addQuotaExceededMessage(message.text);
++      updateQuotaHint(0);
+     }
+   });
+ </script>
+diff --git a/src/extension.ts b/src/extension.ts
+index 754222b..e20ced3 100644
+--- a/src/extension.ts
++++ b/src/extension.ts
+@@ -67,6 +67,20 @@ export function activate(context: vscode.ExtensionContext) {
+   );
+   context.subscriptions.push(setKeyDisposable);
+ 
++  const clearKeyDisposable = vscode.commands.registerCommand(
++    'codebase-architecture-assistant.clearApiKey',
++    async () => {
++      const existingKey = await context.secrets.get('groqApiKey');
++      if (!existingKey) {
++        vscode.window.showInformationMessage('No Groq API key is currently saved.');
++        return;
++      }
++      await context.secrets.delete('groqApiKey');
++      vscode.window.showInformationMessage('Groq API key cleared. You will now use the free-tier proxy.');
++    }
++  );
++  context.subscriptions.push(clearKeyDisposable);
++
+   const disposable = vscode.commands.registerCommand(
+     'codebase-architecture-assistant.showMap',
+     () => {

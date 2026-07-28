@@ -31,7 +31,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.env.machineId
   );
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider)
+    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
+      webviewOptions: { retainContextWhenHidden: true }
+    })
   );
 
   const setKeyDisposable = vscode.commands.registerCommand(

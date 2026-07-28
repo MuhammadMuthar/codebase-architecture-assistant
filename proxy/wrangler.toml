@@ -1,0 +1,13 @@
+name = "codebase-assistant-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Create this KV namespace first with:
+#   npx wrangler kv namespace create QUOTA
+# then paste the returned id below.
+kv_namespaces = [
+  { binding = "QUOTA", id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID" }
+]
+
+[vars]
+FREE_QUESTION_LIMIT = "20"

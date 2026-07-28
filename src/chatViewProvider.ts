@@ -3,6 +3,18 @@ import { ProjectMap } from './types';
 
 const MODEL = 'openai/gpt-oss-120b';
 
+// URL of your own proxy server that holds the real Groq key server-side
+// and enforces the free-tier quota. See proxy/README.md for how to deploy one.
+const PROXY_URL = 'https://your-proxy.example.workers.dev/chat';
+const FREE_QUESTION_LIMIT = 20;
+
+export class QuotaExceededError extends Error {
+  constructor() {
+    super('Free question quota exceeded');
+    this.name = 'QuotaExceededError';
+  }
+}
+
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'codebaseAssistant.chatView';
 
@@ -11,7 +23,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly getProjectMap: () => ProjectMap | undefined,
-    private readonly secrets: vscode.SecretStorage
+    private readonly secrets: vscode.SecretStorage,
+    private readonly globalState: vscode.Memento,
+    private readonly machineId: string
   ) {}
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -25,6 +39,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(async (message: { type: string; text: string }) => {
+      if (message.type === 'setKey') {
+        await vscode.commands.executeCommand('codebase-architecture-assistant.setApiKey');
+        return;
+      }
+
       if (message.type !== 'ask') return;
 
       const map = this.getProjectMap();
@@ -37,22 +56,58 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       const apiKey = await this.secrets.get('groqApiKey');
-      if (!apiKey) {
-        webviewView.webview.postMessage({
-          type: 'answer',
-          text: 'No Groq API key set yet. Run "Codebase Assistant: Set Groq API Key" from the Command Palette first.'
-        });
-        return;
-      }
 
       try {
-        const answer = await askGroq(message.text, map, apiKey);
+        const answer = apiKey
+          ? await askGroq(message.text, map, apiKey)
+          : await this.askViaFreeTier(message.text, map);
         webviewView.webview.postMessage({ type: 'answer', text: answer });
       } catch (err) {
+        if (err instanceof QuotaExceededError) {
+          webviewView.webview.postMessage({
+            type: 'quotaExceeded',
+            text: 'You have used all ' + FREE_QUESTION_LIMIT + ' free questions. ' +
+              'Set your own free Groq API key (console.groq.com/keys) to keep chatting.'
+          });
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
-        webviewView.webview.postMessage({ type: 'answer', text: `Error calling Groq API: ${msg}` });
+        webviewView.webview.postMessage({ type: 'answer', text: `Error: ${msg}` });
       }
     });
+  }
+
+  /**
+   * Calls our own proxy server instead of Groq directly. The proxy holds the
+   * real Groq key and is the SOURCE OF TRUTH for the quota - the local
+   * counter below is only used to show a friendly "x of 20 left" hint and
+   * to avoid a wasted network round-trip once we already know it's spent.
+   */
+  private async askViaFreeTier(question: string, map: ProjectMap): Promise<string> {
+    const used = this.globalState.get<number>('freeQuestionsUsed', 0);
+    if (used >= FREE_QUESTION_LIMIT) {
+      throw new QuotaExceededError();
+    }
+
+    const systemPrompt = buildSystemPrompt(map);
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ machineId: this.machineId, systemPrompt, question })
+    });
+
+    if (response.status === 429) {
+      await this.globalState.update('freeQuestionsUsed', FREE_QUESTION_LIMIT);
+      throw new QuotaExceededError();
+    }
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Free-tier proxy returned ${response.status}: ${errorText}`);
+    }
+
+    await this.globalState.update('freeQuestionsUsed', used + 1);
+    const data: any = await response.json();
+    return data.text ?? '(no text in response)';
   }
 
   private getHtml(webview: vscode.Webview): string {
@@ -211,6 +266,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     return msgDiv;
   }
 
+  function addQuotaExceededMessage(text) {
+    clearEmptyState();
+    const div = document.createElement('div');
+    div.className = 'msg assistant';
+    const p = document.createElement('div');
+    p.textContent = text;
+    div.appendChild(p);
+    const btn = document.createElement('button');
+    btn.textContent = 'Set my Groq API key';
+    btn.style.marginTop = '8px';
+    btn.addEventListener('click', () => vscode.postMessage({ type: 'setKey' }));
+    div.appendChild(btn);
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
   function send() {
     const text = questionEl.value.trim();
     if (!text) return;
@@ -235,12 +306,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const formattedHtml = DOMPurify.sanitize(marked.parse(message.text));
 
       if (thinkingEl) {
-        thinkingEl.innerHTML = formattedHtml; // Use innerHTML instead of textContent
+        thinkingEl.innerHTML = formattedHtml;
         thinkingEl.className = 'msg assistant';
         thinkingEl = null;
       } else {
         addMessage(formattedHtml, 'assistant', true);
       }
+    } else if (message.type === 'quotaExceeded') {
+      if (thinkingEl) {
+        thinkingEl.remove();
+        thinkingEl = null;
+      }
+      addQuotaExceededMessage(message.text);
     }
   });
 </script>
@@ -266,14 +343,18 @@ function buildContextString(map: ProjectMap): string {
   ].join('\n');
 }
 
-async function askGroq(question: string, map: ProjectMap, apiKey: string): Promise<string> {
-  const systemPrompt = [
+function buildSystemPrompt(map: ProjectMap): string {
+  return [
     'You are a codebase architecture assistant embedded in VS Code.',
     "Help the developer understand this specific project's structure and technology choices.",
     "Use the project information below. If something can't be answered from it, say so honestly rather than guessing.",
     '',
     buildContextString(map)
   ].join('\n');
+}
+
+async function askGroq(question: string, map: ProjectMap, apiKey: string): Promise<string> {
+  const systemPrompt = buildSystemPrompt(map);
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',

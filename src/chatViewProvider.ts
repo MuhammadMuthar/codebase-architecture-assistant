@@ -133,32 +133,82 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   button:hover {
     background-color: var(--vscode-button-hoverBackground);
   }
+  /* Markdown Tables */
+  .msg table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+  }
+  .msg th, .msg td {
+    border: 1px solid var(--vscode-panel-border);
+    padding: 6px 10px;
+    text-align: left;
+  }
+  .msg th {
+    background: var(--vscode-editor-inactiveSelectionBackground);
+    font-weight: 600;
+  }
+
+  /* Headings & Code */
+  .msg h1, .msg h2, .msg h3, .msg h4 {
+    margin: 12px 0 6px 0;
+    color: var(--vscode-foreground);
+  }
+  .msg code {
+    background: var(--vscode-textCodeBlock-background);
+    font-family: var(--vscode-editor-font-family);
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+  .msg pre code {
+    display: block;
+    padding: 8px;
+    overflow-x: auto;
+  }
+  .msg ul, .msg ol {
+    margin: 6px 0;
+    padding-left: 20px;
+  }
 </style>
 </head>
 <body>
 <div id="messages">
-  <div class="empty-state">Ask a question about this project.</div>
+  <div class="empty-state" id="empty-state">Ask a question about this project.</div>
 </div>
 <div id="input-row">
   <textarea id="question" rows="2" placeholder="Ask about this codebase..."></textarea>
   <button id="send">Send</button>
 </div>
+<script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
   const messagesEl = document.getElementById('messages');
   const questionEl = document.getElementById('question');
   const sendBtn = document.getElementById('send');
+  const emptyStateEl = document.getElementById('empty-state');
   let thinkingEl = null;
 
-  function addMessage(text, role) {
-    const empty = messagesEl.querySelector('.empty-state');
-    if (empty) empty.remove();
-    const div = document.createElement('div');
-    div.className = 'msg ' + role;
-    div.textContent = text;
-    messagesEl.appendChild(div);
+  function clearEmptyState() {
+    if (emptyStateEl && emptyStateEl.parentNode) {
+      emptyStateEl.parentNode.removeChild(emptyStateEl);
+    }
+  }
+
+  function addMessage(text, sender, isHtml = false) {
+    clearEmptyState();
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'msg ' + sender;
+
+    if (isHtml) {
+      msgDiv.innerHTML = text;
+    } else {
+      msgDiv.textContent = text;
+    }
+
+    messagesEl.appendChild(msgDiv);
     messagesEl.scrollTop = messagesEl.scrollHeight;
-    return div;
+    return msgDiv;
   }
 
   function send() {
@@ -181,17 +231,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   window.addEventListener('message', (event) => {
     const message = event.data;
     if (message.type === 'answer') {
+      // Parse Markdown to HTML and sanitize it
+      const formattedHtml = DOMPurify.sanitize(marked.parse(message.text));
+
       if (thinkingEl) {
-        thinkingEl.textContent = message.text;
+        thinkingEl.innerHTML = formattedHtml; // Use innerHTML instead of textContent
         thinkingEl.className = 'msg assistant';
         thinkingEl = null;
       } else {
-        addMessage(message.text, 'assistant');
+        addMessage(formattedHtml, 'assistant', true);
       }
     }
   });
 </script>
-</body>
+  </body>
 </html>`;
   }
 }

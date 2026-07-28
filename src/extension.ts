@@ -67,6 +67,20 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(setKeyDisposable);
 
+  const clearKeyDisposable = vscode.commands.registerCommand(
+    'codebase-architecture-assistant.clearApiKey',
+    async () => {
+      const existingKey = await context.secrets.get('groqApiKey');
+      if (!existingKey) {
+        vscode.window.showInformationMessage('No Groq API key is currently saved.');
+        return;
+      }
+      await context.secrets.delete('groqApiKey');
+      vscode.window.showInformationMessage('Groq API key cleared. You will now use the free-tier proxy.');
+    }
+  );
+  context.subscriptions.push(clearKeyDisposable);
+
   const disposable = vscode.commands.registerCommand(
     'codebase-architecture-assistant.showMap',
     () => {

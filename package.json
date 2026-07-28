@@ -20,7 +20,12 @@
       {
         "command": "codebase-architecture-assistant.setApiKey",
         "title": "Codebase Assistant: Set Groq API Key"
+      },
+      {
+        "command": "codebase-architecture-assistant.clearApiKey",
+        "title": "Codebase Assistant: Clear Groq API Key"
       }
+
     ],
     "viewsContainers": {
       "activitybar": [
@@ -50,21 +55,17 @@
     "test": "vscode-test"
   },
   "devDependencies": {
+    "@types/vscode": "^1.103.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
-    "@types/vscode": "^1.103.0",
-    "@vscode/test-cli": "^0.0.15",
-    "@vscode/test-electron": "^3.0.0",
+    "typescript-eslint": "^8.61.1",
     "eslint": "^10.5.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.61.1"
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0"
   },
   "overrides": {
     "diff": "^8.0.4",
     "serialize-javascript": "^7.0.6"
-  },
-  "dependencies": {
-    "marked": "^18.0.7",
-    "run": "^1.5.0"
   }
 }

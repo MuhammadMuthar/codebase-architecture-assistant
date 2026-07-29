@@ -22,11 +22,9 @@
         "title": "Codebase Assistant: Set Groq API Key"
       },
       {
-
         "command": "codebase-architecture-assistant.clearApiKey",
         "title": "Codebase Assistant: Clear Groq API Key"
       }
-
     ],
     "viewsContainers": {
       "activitybar": [

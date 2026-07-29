@@ -36,16 +36,46 @@ export default {
       return json({ error: 'Invalid JSON body' }, 400);
     }
 
-    const { machineId, systemPrompt, question } = body || {};
+    const { machineId, systemPrompt, question, messages } = body || {};
 
     if (!machineId || typeof machineId !== 'string') {
       return json({ error: 'Missing machineId' }, 400);
     }
-    if (!question || typeof question !== 'string') {
-      return json({ error: 'Missing question' }, 400);
+
+    // Build a validated conversation array. Prefer the new `messages` shape
+    // (full bounded history from the client); fall back to the legacy
+    // single-`question` shape so an older/newer client version pairing
+    // during a rollout doesn't just hard-fail.
+    let conversation;
+    if (messages !== undefined) {
+      if (!Array.isArray(messages) || messages.length === 0 || messages.length > 40) {
+        return json({ error: 'Invalid messages array' }, 400);
+      }
+      conversation = [];
+      let totalChars = 0;
+      for (const m of messages) {
+        if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string') {
+          return json({ error: 'Invalid message entry (expected {role, content})' }, 400);
+        }
+        if (m.content.length > 4000) {
+          return json({ error: 'Request too large' }, 413);
+        }
+        totalChars += m.content.length;
+        conversation.push({ role: m.role, content: m.content });
+      }
+      if (totalChars > 20000) {
+        return json({ error: 'Request too large' }, 413);
+      }
+    } else if (typeof question === 'string' && question) {
+      if (question.length > 4000) {
+        return json({ error: 'Request too large' }, 413);
+      }
+      conversation = [{ role: 'user', content: question }];
+    } else {
+      return json({ error: 'Missing messages or question' }, 400);
     }
-    // Basic sanity caps so a single request can't blow up token usage / cost.
-    if (question.length > 4000 || (systemPrompt && systemPrompt.length > 20000)) {
+
+    if (systemPrompt && systemPrompt.length > 20000) {
       return json({ error: 'Request too large' }, 413);
     }
 
@@ -76,7 +106,7 @@ export default {
           model: MODEL,
           messages: [
             { role: 'system', content: systemPrompt || '' },
-            { role: 'user', content: question }
+            ...conversation
           ]
         })
       });

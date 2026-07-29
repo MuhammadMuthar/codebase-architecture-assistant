@@ -12,9 +12,22 @@ const FREE_WINDOW_SECONDS = 60 * 60 * 24; // 24 hours, mirrors proxy/worker.js
 const HISTORY_KEY = 'chatHistory';
 const MAX_HISTORY_MESSAGES = 100; // keep workspaceState + payload size bounded
 
+// Bounds on how much PRIOR conversation gets fed back into the model as
+// context (separate from MAX_HISTORY_MESSAGES above, which only bounds what's
+// persisted for display). Kept deliberately smaller than the display history
+// so a long session doesn't balloon token cost/latency on every question.
+const MAX_CONTEXT_TURNS = 12;          // most recent prior user+assistant messages to include
+const MAX_CONTEXT_ENTRY_CHARS = 1500;  // per-message cap when replayed as context
+const MAX_CONTEXT_TOTAL_CHARS = 8000;  // combined cap across all prior context messages
+
 interface ChatHistoryEntry {
   sender: 'user' | 'assistant';
   text: string;
+}
+
+interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 export class QuotaExceededError extends Error {
@@ -141,13 +154,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async processAndRespond(webview: vscode.Webview, map: ProjectMap, promptForModel: string): Promise<void> {
     const apiKey = await this.secrets.get('groqApiKey');
 
+    // getHistory() already includes the current question as its last entry
+    // (appendToHistory ran before processAndRespond was called), so prior
+    // context is everything before that. We replay those prior turns as-is,
+    // then use promptForModel — not the possibly-different displayText that
+    // was stored for the current turn — as the final user message, so
+    // enriched prompts (e.g. "Explain selection" with the code attached)
+    // still reach the model in full on the turn they're asked, while only
+    // their short display label is replayed as context in later turns.
+    const priorHistory = this.getHistory().slice(0, -1);
+    const conversationMessages = buildConversationMessages(priorHistory, promptForModel);
+
     try {
       if (apiKey) {
-        const answer = await askGroq(promptForModel, map, apiKey);
+        const answer = await askGroq(conversationMessages, map, apiKey);
         await this.appendToHistory({ sender: 'assistant', text: answer });
         webview.postMessage({ type: 'answer', text: answer });
       } else {
-        const { text, remaining } = await this.askViaFreeTier(promptForModel, map);
+        const { text, remaining } = await this.askViaFreeTier(conversationMessages, map);
         await this.appendToHistory({ sender: 'assistant', text });
         webview.postMessage({ type: 'answer', text, freeRemaining: remaining });
       }
@@ -177,7 +201,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * counter below is only used to show a friendly "x of 20 left" hint and
    * to avoid a wasted network round-trip once we already know it's spent.
    */
-  private async askViaFreeTier(question: string, map: ProjectMap): Promise<{ text: string; remaining: number }> {
+  private async askViaFreeTier(messages: ConversationMessage[], map: ProjectMap): Promise<{ text: string; remaining: number }> {
     const now = Math.floor(Date.now() / 1000);
     let used = this.globalState.get<number>('freeQuestionsUsed', 0);
     let windowStart = this.globalState.get<number>('freeTierWindowStart', now);
@@ -201,7 +225,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const response = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ machineId: this.machineId, systemPrompt, question })
+      body: JSON.stringify({ machineId: this.machineId, systemPrompt, messages })
     });
 
     if (response.status === 429) {
@@ -553,7 +577,52 @@ function buildSystemPrompt(map: ProjectMap): string {
   ].join('\n');
 }
 
-async function askGroq(question: string, map: ProjectMap, apiKey: string): Promise<string> {
+/**
+ * Converts persisted chat history into a bounded message array suitable for
+ * the model's `messages` field, then appends the current turn's full prompt.
+ *
+ * Bounding rules (see MAX_CONTEXT_* constants):
+ * - Only the most recent MAX_CONTEXT_TURNS prior messages are considered.
+ * - Each replayed message is capped at MAX_CONTEXT_ENTRY_CHARS.
+ * - The combined size of all replayed messages is capped at
+ *   MAX_CONTEXT_TOTAL_CHARS; if exceeded, the OLDEST kept turns are dropped
+ *   first (we walk from most-recent backwards and stop once the budget is
+ *   used up), so recent context is preserved over older context.
+ * - If dropping messages leaves a leading assistant message with no
+ *   preceding user message, that dangling leading message is dropped too,
+ *   so the conversation always opens on a user turn.
+ */
+function buildConversationMessages(
+  priorHistory: ChatHistoryEntry[],
+  currentPrompt: string
+): ConversationMessage[] {
+  const recent = priorHistory.slice(-MAX_CONTEXT_TURNS);
+
+  const kept: ConversationMessage[] = [];
+  let totalChars = 0;
+
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const entry = recent[i];
+    let content = entry.text;
+    if (content.length > MAX_CONTEXT_ENTRY_CHARS) {
+      content = content.slice(0, MAX_CONTEXT_ENTRY_CHARS) + '\n...(truncated for context)';
+    }
+    if (totalChars + content.length > MAX_CONTEXT_TOTAL_CHARS) {
+      break; // budget used up; remaining (older) entries are dropped
+    }
+    totalChars += content.length;
+    kept.unshift({ role: entry.sender === 'user' ? 'user' : 'assistant', content });
+  }
+
+  while (kept.length > 0 && kept[0].role !== 'user') {
+    kept.shift();
+  }
+
+  kept.push({ role: 'user', content: currentPrompt });
+  return kept;
+}
+
+async function askGroq(messages: ConversationMessage[], map: ProjectMap, apiKey: string): Promise<string> {
   const systemPrompt = buildSystemPrompt(map);
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -567,7 +636,7 @@ async function askGroq(question: string, map: ProjectMap, apiKey: string): Promi
       max_tokens: 800,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: question }
+        ...messages
       ]
     })
   });

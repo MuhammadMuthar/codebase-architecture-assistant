@@ -24,6 +24,14 @@
       {
         "command": "codebase-architecture-assistant.clearApiKey",
         "title": "Codebase Assistant: Clear Groq API Key"
+      },
+      {
+        "command": "codebase-architecture-assistant.askAboutFile",
+        "title": "Codebase Assistant: Ask About This File"
+      },
+      {
+        "command": "codebase-architecture-assistant.explainSelection",
+        "title": "Codebase Assistant: Explain Selection"
       }
     ],
     "viewsContainers": {
@@ -41,6 +49,22 @@
           "type": "webview",
           "id": "codebaseAssistant.chatView",
           "name": "Chat"
+        }
+      ]
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "codebase-architecture-assistant.askAboutFile",
+          "group": "codebaseAssistant",
+          "when": "!explorerResourceIsFolder"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "codebase-architecture-assistant.explainSelection",
+          "group": "codebaseAssistant",
+          "when": "editorHasSelection"
         }
       ]
     }

@@ -7,6 +7,7 @@ const MODEL = 'openai/gpt-oss-120b';
 // and enforces the free-tier quota. See proxy/README.md for how to deploy one.
 const PROXY_URL = 'https://codebase-assistant-proxy.muthar-dev.workers.dev/';
 const FREE_QUESTION_LIMIT = 20;
+const FREE_WINDOW_SECONDS = 60 * 60 * 24; // 24 hours, mirrors proxy/worker.js
 
 const HISTORY_KEY = 'chatHistory';
 const MAX_HISTORY_MESSAGES = 100; // keep workspaceState + payload size bounded
@@ -17,7 +18,7 @@ interface ChatHistoryEntry {
 }
 
 export class QuotaExceededError extends Error {
-  constructor() {
+  constructor(public readonly resetInSeconds?: number) {
     super('Free question quota exceeded');
     this.name = 'QuotaExceededError';
   }
@@ -27,6 +28,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'codebaseAssistant.chatView';
 
   private view?: vscode.WebviewView;
+  private webviewReady = false;
+  private pendingExternalAsk?: { displayText: string; prompt: string };
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -62,7 +65,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.onDidReceiveMessage(async (message: { type: string; text: string }) => {
       if (message.type === 'ready') {
+        this.webviewReady = true;
         webviewView.webview.postMessage({ type: 'restoreHistory', history: this.getHistory() });
+        if (this.pendingExternalAsk) {
+          const pending = this.pendingExternalAsk;
+          this.pendingExternalAsk = undefined;
+          await this.runExternalAsk(webviewView.webview, pending.displayText, pending.prompt);
+        }
         return;
       }
 
@@ -86,32 +95,80 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       await this.appendToHistory({ sender: 'user', text: message.text });
-
-      const apiKey = await this.secrets.get('groqApiKey');
-
-      try {
-        if (apiKey) {
-          const answer = await askGroq(message.text, map, apiKey);
-          await this.appendToHistory({ sender: 'assistant', text: answer });
-          webviewView.webview.postMessage({ type: 'answer', text: answer });
-        } else {
-          const { text, remaining } = await this.askViaFreeTier(message.text, map);
-          await this.appendToHistory({ sender: 'assistant', text });
-          webviewView.webview.postMessage({ type: 'answer', text, freeRemaining: remaining });
-        }
-      } catch (err) {
-        if (err instanceof QuotaExceededError) {
-          webviewView.webview.postMessage({
-            type: 'quotaExceeded',
-            text: 'You have used all ' + FREE_QUESTION_LIMIT + ' free questions. ' +
-              'Set your own free Groq API key (console.groq.com/keys) to keep chatting.'
-          });
-          return;
-        }
-        const msg = err instanceof Error ? err.message : String(err);
-        webviewView.webview.postMessage({ type: 'answer', text: `Error: ${msg}` });
-      }
+      await this.processAndRespond(webviewView.webview, map, message.text);
     });
+  }
+
+  /**
+   * Entry point for commands outside the chat input box (e.g. "Ask about this
+   * file" from the Explorer, "Explain selection" from the editor). Brings the
+   * chat view into focus, shows the question in the chat like a normal typed
+   * one, and runs it through the exact same Groq/proxy/history pipeline.
+   */
+  public async askExternally(displayText: string, prompt: string): Promise<void> {
+    await vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
+
+    if (!this.view) {
+      vscode.window.showWarningMessage('Could not open the Codebase Assistant chat view.');
+      return;
+    }
+
+    if (!this.webviewReady) {
+      // The webview page hasn't finished loading/registering its message
+      // listener yet - queue this and the 'ready' handshake above will run it.
+      this.pendingExternalAsk = { displayText, prompt };
+      return;
+    }
+
+    await this.runExternalAsk(this.view.webview, displayText, prompt);
+  }
+
+  private async runExternalAsk(webview: vscode.Webview, displayText: string, prompt: string): Promise<void> {
+    const map = this.getProjectMap();
+    if (!map) {
+      webview.postMessage({
+        type: 'answer',
+        text: "I don't have a project map yet - open a folder first."
+      });
+      return;
+    }
+
+    webview.postMessage({ type: 'userMessage', text: displayText });
+    await this.appendToHistory({ sender: 'user', text: displayText });
+    await this.processAndRespond(webview, map, prompt);
+  }
+
+  private async processAndRespond(webview: vscode.Webview, map: ProjectMap, promptForModel: string): Promise<void> {
+    const apiKey = await this.secrets.get('groqApiKey');
+
+    try {
+      if (apiKey) {
+        const answer = await askGroq(promptForModel, map, apiKey);
+        await this.appendToHistory({ sender: 'assistant', text: answer });
+        webview.postMessage({ type: 'answer', text: answer });
+      } else {
+        const { text, remaining } = await this.askViaFreeTier(promptForModel, map);
+        await this.appendToHistory({ sender: 'assistant', text });
+        webview.postMessage({ type: 'answer', text, freeRemaining: remaining });
+      }
+    } catch (err) {
+      if (err instanceof QuotaExceededError) {
+        const hoursLeft = typeof err.resetInSeconds === 'number'
+          ? Math.max(1, Math.ceil(err.resetInSeconds / 3600))
+          : undefined;
+        const resetMsg = hoursLeft
+          ? `They'll reset in about ${hoursLeft} hour${hoursLeft === 1 ? '' : 's'}, `
+          : 'They reset every 24 hours, ';
+        webview.postMessage({
+          type: 'quotaExceeded',
+          text: 'You have used all ' + FREE_QUESTION_LIMIT + ' free questions for this 24h window. ' +
+            resetMsg + 'or set your own free Groq API key (console.groq.com/keys) to keep chatting now.'
+        });
+        return;
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      webview.postMessage({ type: 'answer', text: `Error: ${msg}` });
+    }
   }
 
   /**
@@ -121,9 +178,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * to avoid a wasted network round-trip once we already know it's spent.
    */
   private async askViaFreeTier(question: string, map: ProjectMap): Promise<{ text: string; remaining: number }> {
-    const used = this.globalState.get<number>('freeQuestionsUsed', 0);
+    const now = Math.floor(Date.now() / 1000);
+    let used = this.globalState.get<number>('freeQuestionsUsed', 0);
+    let windowStart = this.globalState.get<number>('freeTierWindowStart', now);
+
+    if (now - windowStart >= FREE_WINDOW_SECONDS) {
+      // A full 24h window has passed since the first question in the
+      // previous window: start a fresh one, locally, before even asking
+      // the proxy (the proxy will independently agree, since it uses the
+      // same fixed-window logic keyed by machineId).
+      used = 0;
+      windowStart = now;
+      await this.globalState.update('freeQuestionsUsed', 0);
+      await this.globalState.update('freeTierWindowStart', windowStart);
+    }
+
     if (used >= FREE_QUESTION_LIMIT) {
-      throw new QuotaExceededError();
+      throw new QuotaExceededError(FREE_WINDOW_SECONDS - (now - windowStart));
     }
 
     const systemPrompt = buildSystemPrompt(map);
@@ -134,8 +205,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
 
     if (response.status === 429) {
+      // Server-side is the source of truth; sync our local state to it.
+      let resetInSeconds: number | undefined;
+      try {
+        const errData: any = await response.json();
+        resetInSeconds = typeof errData.resetInSeconds === 'number' ? errData.resetInSeconds : undefined;
+      } catch {
+        // ignore parse errors, fall back to local estimate below
+      }
       await this.globalState.update('freeQuestionsUsed', FREE_QUESTION_LIMIT);
-      throw new QuotaExceededError();
+      if (typeof resetInSeconds === 'number') {
+        await this.globalState.update('freeTierWindowStart', now - (FREE_WINDOW_SECONDS - resetInSeconds));
+      }
+      throw new QuotaExceededError(resetInSeconds ?? FREE_WINDOW_SECONDS - (now - windowStart));
     }
     if (!response.ok) {
       const errorText = await response.text();
@@ -430,6 +512,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       updateQuotaHint(0);
     } else if (message.type === 'restoreHistory') {
       restoreHistory(message.history);
+    } else if (message.type === 'userMessage') {
+      addMessage(message.text, 'user');
+      thinkingEl = addMessage('Thinking...', 'assistant thinking');
     }
   });
 

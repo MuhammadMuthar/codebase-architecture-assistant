@@ -7,6 +7,15 @@ import { ChatViewProvider } from './chatViewProvider';
 
 let cachedMap: ProjectMap | undefined;
 
+// Keeps a single file/selection prompt from blowing up token usage or cost.
+const MAX_SNIPPET_CHARS = 6000;
+
+function truncate(content: string): string {
+  return content.length > MAX_SNIPPET_CHARS
+    ? content.slice(0, MAX_SNIPPET_CHARS) + '\n... (truncated, file is longer)'
+    : content;
+}
+
 function buildProjectMap(rootPath: string): ProjectMap {
   const tree = scanDirectory(rootPath);
   const allFiles = flattenFiles(tree);
@@ -99,6 +108,67 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(disposable);
+
+  const askAboutFileDisposable = vscode.commands.registerCommand(
+    'codebase-architecture-assistant.askAboutFile',
+    async (uri?: vscode.Uri) => {
+      const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
+      if (!targetUri) {
+        vscode.window.showWarningMessage('No file selected.');
+        return;
+      }
+
+      let content: string;
+      try {
+        const bytes = await vscode.workspace.fs.readFile(targetUri);
+        content = Buffer.from(bytes).toString('utf8');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        vscode.window.showErrorMessage(`Could not read file: ${msg}`);
+        return;
+      }
+
+      const relPath = vscode.workspace.asRelativePath(targetUri);
+      const prompt = [
+        `File: ${relPath}`,
+        '',
+        '```',
+        truncate(content),
+        '```',
+        '',
+        'Explain what this file does and how it likely fits into the rest of the project.'
+      ].join('\n');
+
+      await chatProvider.askExternally(`Explain ${relPath}`, prompt);
+    }
+  );
+  context.subscriptions.push(askAboutFileDisposable);
+
+  const explainSelectionDisposable = vscode.commands.registerCommand(
+    'codebase-architecture-assistant.explainSelection',
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.selection.isEmpty) {
+        vscode.window.showWarningMessage('Select some code first.');
+        return;
+      }
+
+      const selectedText = editor.document.getText(editor.selection);
+      const relPath = vscode.workspace.asRelativePath(editor.document.uri);
+      const prompt = [
+        `Selected code from ${relPath}:`,
+        '',
+        '```',
+        truncate(selectedText),
+        '```',
+        '',
+        'Explain what this code does.'
+      ].join('\n');
+
+      await chatProvider.askExternally(`Explain selected code in ${relPath}`, prompt);
+    }
+  );
+  context.subscriptions.push(explainSelectionDisposable);
 }
 
 export function deactivate() {}

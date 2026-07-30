@@ -3,11 +3,18 @@
   "displayName": "codebase-architecture-assistant",
   "description": "An AI-powered developer assistant that understands an entire project automatically and answers architecture questions without the developer having to explain the codebase.",
   "version": "0.0.1",
+  "publisher": "muhammad-muthar",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MuhammadMuthar/codebase-architecture-assistant.git"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.103.0"
   },
   "categories": [
-    "Other"
+    "AI"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",

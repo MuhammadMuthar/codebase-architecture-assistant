@@ -1,0 +1,662 @@
+diff --git a/media/icon.svg b/media/icon.svg
+index f101301..0dc082a 100644
+--- a/media/icon.svg
++++ b/media/icon.svg
+@@ -1,4 +1,10 @@
+ <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+-  <path d="M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+-  <path d="M9 9l-2 2 2 2M15 9l2 2-2 2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+-</svg>
+\ No newline at end of file
++  <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
++  <path d="M21 7V4.5A1.5 1.5 0 0 0 19.5 3H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
++  <path d="M3 17v2.5A1.5 1.5 0 0 0 4.5 21H7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
++  <path d="M21 17v2.5a1.5 1.5 0 0 1-1.5 1.5H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
++  <path d="M12 9.8L8.4 14.6M12 9.8l3.6 4.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
++  <circle cx="12" cy="8.4" r="1.6" fill="currentColor"/>
++  <circle cx="8" cy="15.8" r="1.6" fill="currentColor"/>
++  <circle cx="16" cy="15.8" r="1.6" fill="currentColor"/>
++</svg>
+diff --git a/media/logo.png b/media/logo.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..da3027a76f9cbda4aef77dd721062e8a68cbe978
+GIT binary patch
+literal 11385
+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
+D%H}us
+
+literal 0
+HcmV?d00001
+
+diff --git a/media/logo.svg b/media/logo.svg
+new file mode 100644
+index 0000000..73824a6
+--- /dev/null
++++ b/media/logo.svg
+@@ -0,0 +1,26 @@
++<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
++  <defs>
++    <linearGradient id="bg" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
++      <stop offset="0" stop-color="#1B1E24"/>
++      <stop offset="1" stop-color="#0F1114"/>
++    </linearGradient>
++  </defs>
++  <rect width="256" height="256" rx="52" fill="url(#bg)"/>
++
++  <!-- corner frame, amber -->
++  <g stroke="#E8A33D" stroke-width="10" stroke-linecap="round" fill="none">
++    <path d="M40 78V52a12 12 0 0 1 12-12h26"/>
++    <path d="M216 78V52a12 12 0 0 0-12-12h-26"/>
++    <path d="M40 178v26a12 12 0 0 0 12 12h26"/>
++    <path d="M216 178v26a12 12 0 0 1-12 12h-26"/>
++  </g>
++
++  <!-- node graph, slate blue lines + amber root / slate leaves -->
++  <g stroke="#8CA0B8" stroke-width="7" stroke-linecap="round">
++    <path d="M128 108L90 158"/>
++    <path d="M128 108l38 50"/>
++  </g>
++  <circle cx="128" cy="96" r="16" fill="#E8A33D"/>
++  <circle cx="86" cy="168" r="14" fill="#8CA0B8"/>
++  <circle cx="170" cy="168" r="14" fill="#8CA0B8"/>
++</svg>
+diff --git a/package.json b/package.json
+index 094ceb7..02e702b 100644
+--- a/package.json
++++ b/package.json
+@@ -1,8 +1,9 @@
+ {
+   "name": "codebase-architecture-assistant",
+-  "displayName": "codebase-architecture-assistant",
++  "displayName": "Codebase Assistant",
+   "description": "An AI-powered developer assistant that understands an entire project automatically and answers architecture questions without the developer having to explain the codebase.",
+   "version": "0.0.1",
++  "icon": "media/logo.png",
+   "engines": {
+     "vscode": "^1.103.0"
+   },
+diff --git a/src/chatViewProvider.ts b/src/chatViewProvider.ts
+index 06fee2f..bb8da85 100644
+--- a/src/chatViewProvider.ts
++++ b/src/chatViewProvider.ts
+@@ -240,6 +240,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+ <meta charset="UTF-8">
+ <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+ <style>
++  :root {
++    --accent: #E8A33D;
++  }
++  * {
++    box-sizing: border-box;
++  }
+   body {
+     font-family: var(--vscode-font-family);
+     color: var(--vscode-foreground);
+@@ -249,66 +255,159 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+     display: flex;
+     flex-direction: column;
+     height: 100vh;
+-    box-sizing: border-box;
++    font-size: 13px;
++  }
++  #app-header {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    padding: 10px 12px;
++    border-bottom: 1px solid var(--vscode-panel-border);
++    flex-shrink: 0;
++  }
++  #brand {
++    display: flex;
++    align-items: center;
++    gap: 7px;
++    min-width: 0;
++  }
++  #brand-mark {
++    width: 15px;
++    height: 15px;
++    color: var(--accent);
++    flex-shrink: 0;
++  }
++  #brand-label {
++    font-size: 11px;
++    font-weight: 600;
++    letter-spacing: 0.07em;
++    text-transform: uppercase;
++    opacity: 0.82;
++    white-space: nowrap;
++    overflow: hidden;
++    text-overflow: ellipsis;
++  }
++  .icon-btn {
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    width: 24px;
++    height: 24px;
++    background: transparent;
++    color: var(--vscode-descriptionForeground);
++    border: none;
++    border-radius: 5px;
++    padding: 0;
++    cursor: pointer;
++    flex-shrink: 0;
++  }
++  .icon-btn:hover {
++    background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
++    color: var(--vscode-foreground);
+   }
+   #messages {
+     flex: 1;
+     overflow-y: auto;
+-    padding: 12px;
++    padding: 14px 12px;
+   }
+   .msg {
+-    margin-bottom: 12px;
+-    padding: 8px 10px;
+-    border-radius: 6px;
++    margin-bottom: 16px;
+     font-size: 13px;
+-    line-height: 1.4;
++    line-height: 1.55;
+     white-space: pre-wrap;
++    max-width: 94%;
+   }
+   .msg.user {
+-    background-color: var(--vscode-badge-background);
+-    color: var(--vscode-badge-foreground);
++    margin-left: auto;
++    background-color: var(--vscode-list-inactiveSelectionBackground, var(--vscode-editorWidget-background));
++    color: var(--vscode-foreground);
++    padding: 7px 11px;
++    border-radius: 10px 10px 2px 10px;
+   }
+   .msg.assistant {
+-    background-color: var(--vscode-editorWidget-background);
+-    border: 1px solid var(--vscode-widget-border, transparent);
++    border-left: 2px solid var(--accent);
++    padding: 1px 0 1px 12px;
+   }
+   .msg.thinking {
+     color: var(--vscode-descriptionForeground);
+     font-style: italic;
++    border-left-color: var(--vscode-panel-border);
++  }
++  .quota-card {
++    background: var(--vscode-editorWidget-background);
++    border-radius: 0 8px 8px 0;
++    padding: 10px 12px;
+   }
+   .empty-state {
++    display: flex;
++    flex-direction: column;
++    align-items: center;
++    text-align: center;
++    gap: 10px;
+     color: var(--vscode-descriptionForeground);
+-    padding: 16px 12px;
+-    font-size: 13px;
++    padding: 44px 24px;
++  }
++  #empty-mark {
++    width: 30px;
++    height: 30px;
++    color: var(--accent);
++    opacity: 0.9;
+   }
+   #input-row {
+     display: flex;
++    align-items: flex-end;
+     gap: 6px;
+-    padding: 8px;
++    padding: 8px 10px;
+     border-top: 1px solid var(--vscode-panel-border);
++    flex-shrink: 0;
+   }
+   #question {
+     flex: 1;
+     background-color: var(--vscode-input-background);
+     color: var(--vscode-input-foreground);
+-    border: 1px solid var(--vscode-input-border, transparent);
+-    border-radius: 4px;
+-    padding: 6px 8px;
++    border: 1px solid transparent;
++    border-radius: 8px;
++    padding: 7px 10px;
+     font-family: inherit;
+     font-size: 13px;
+     resize: none;
+-  }
+-  button {
+-    background-color: var(--vscode-button-background);
+-    color: var(--vscode-button-foreground);
++    min-height: 32px;
++    max-height: 120px;
++    overflow-y: auto;
++    transition: border-color 0.12s ease;
++  }
++  #question:focus {
++    outline: none;
++    border-color: var(--accent);
++  }
++  #send {
++    width: 32px;
++    height: 32px;
++    background: var(--accent);
++    color: #1B1E24;
++    border-radius: 8px;
++  }
++  #send:hover {
++    background: #F0AE52;
++    color: #1B1E24;
++  }
++  #send:disabled {
++    opacity: 0.4;
++    cursor: default;
++  }
++  .btn-accent {
++    background: var(--accent);
++    color: #1B1E24;
+     border: none;
+-    border-radius: 4px;
++    border-radius: 6px;
+     padding: 6px 12px;
+-    font-size: 13px;
++    font-size: 12px;
++    font-weight: 500;
+     cursor: pointer;
++    margin-top: 8px;
+   }
+-  button:hover {
+-    background-color: var(--vscode-button-hoverBackground);
++  .btn-accent:hover {
++    background: #F0AE52;
+   }
+   /* Markdown Tables */
+   .msg table {
+@@ -348,70 +447,99 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+   }
+   #quota-hint {
+     display: none;
+-    font-size: 11px;
+-    color: var(--vscode-descriptionForeground);
+-    padding: 4px 8px 0 8px;
+     text-align: right;
++    padding: 0 10px;
+   }
+   #quota-hint.visible {
+     display: block;
+   }
+-  #quota-hint.low {
+-    color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+-  }  #header-row {
+-    display: flex;
+-    justify-content: flex-end;
+-    padding: 6px 8px 0 8px;
+-  }
+-  #header-row button {
+-    background: transparent;
++  #quota-hint .pill {
++    display: inline-block;
++    font-size: 10.5px;
+     color: var(--vscode-descriptionForeground);
+-    border: 1px solid var(--vscode-panel-border);
+-    padding: 2px 8px;
+-    font-size: 11px;
++    background: var(--vscode-badge-background, rgba(127,127,127,0.15));
++    padding: 2px 9px;
++    border-radius: 9px;
++    margin-bottom: 6px;
+   }
+-  #header-row button:hover {
+-    background: var(--vscode-toolbar-hoverBackground, var(--vscode-editorWidget-background));
+-    color: var(--vscode-foreground);
++  #quota-hint.low .pill {
++    color: var(--accent);
+   }
+ </style>
+ </head>
+ <body>
+-<div id="header-row">
+-  <button id="clear" title="Clear chat history">Clear chat</button>
+-</div>
++<header id="app-header">
++  <div id="brand">
++    <svg id="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
++      <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
++      <path d="M21 7V4.5A1.5 1.5 0 0 0 19.5 3H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
++      <path d="M3 17v2.5A1.5 1.5 0 0 0 4.5 21H7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
++      <path d="M21 17v2.5a1.5 1.5 0 0 1-1.5 1.5H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
++      <path d="M12 9.8L8.4 14.6M12 9.8l3.6 4.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
++      <circle cx="12" cy="8.4" r="1.7" fill="currentColor"/>
++      <circle cx="8" cy="15.8" r="1.7" fill="currentColor"/>
++      <circle cx="16" cy="15.8" r="1.7" fill="currentColor"/>
++    </svg>
++    <span id="brand-label">Codebase Assistant</span>
++  </div>
++  <button id="clear" class="icon-btn" title="Clear chat" aria-label="Clear chat">
++    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
++      <path d="M3 4.5h10M6.5 4.5V2.8a.8.8 0 0 1 .8-.8h1.4a.8.8 0 0 1 .8.8v1.7M4.6 4.5l.6 8.8c.03.5.45.9.95.9h3.7c.5 0 .92-.4.95-.9l.6-8.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
++    </svg>
++  </button>
++</header>
+ <div id="messages">
+-  <div class="empty-state" id="empty-state">Ask a question about this project.</div>
++  <div class="empty-state" id="empty-state">
++    <svg id="empty-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
++      <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
++      <path d="M21 7V4.5A1.5 1.5 0 0 0 19.5 3H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
++      <path d="M3 17v2.5A1.5 1.5 0 0 0 4.5 21H7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
++      <path d="M21 17v2.5a1.5 1.5 0 0 1-1.5 1.5H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
++      <path d="M12 9.8L8.4 14.6M12 9.8l3.6 4.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
++      <circle cx="12" cy="8.4" r="1.6" fill="currentColor"/>
++      <circle cx="8" cy="15.8" r="1.6" fill="currentColor"/>
++      <circle cx="16" cy="15.8" r="1.6" fill="currentColor"/>
++    </svg>
++    <p style="margin: 0;">Ask a question about this project's structure, stack, or code.</p>
++  </div>
+ </div>
+ <div id="quota-hint"></div>
+ <div id="input-row">
+-  <textarea id="question" rows="2" placeholder="Ask about this codebase..."></textarea>
+-  <button id="send">Send</button>
++  <textarea id="question" rows="1" placeholder="Ask about this codebase…"></textarea>
++  <button id="send" class="icon-btn" title="Send" aria-label="Send message">
++    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
++      <path d="M2 8L13.5 2.2a.5.5 0 0 1 .7.6L11 13.5a.5.5 0 0 1-.94.05L7 8l-4.7-.3a.4.4 0 0 1-.3-.7z" fill="currentColor"/>
++    </svg>
++  </button>
+ </div>
+ <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+ <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+ <script nonce="${nonce}">
+   const vscode = acquireVsCodeApi();
+   const messagesEl = document.getElementById('messages');
++  const EMPTY_STATE_HTML = messagesEl.innerHTML;
+   const questionEl = document.getElementById('question');
+   const sendBtn = document.getElementById('send');
+   const clearBtn = document.getElementById('clear');
+-  const emptyStateEl = document.getElementById('empty-state');
+   const quotaHintEl = document.getElementById('quota-hint');
+   let thinkingEl = null;
+ 
+   function updateQuotaHint(remaining) {
+     if (typeof remaining !== 'number') return;
+-    quotaHintEl.textContent = remaining === 0
+-      ? 'No free questions left - set your own Groq API key to continue.'
++    const text = remaining === 0
++      ? 'No free questions left — set your own Groq API key to continue'
+       : remaining + ' free question' + (remaining === 1 ? '' : 's') + ' remaining';
++    quotaHintEl.innerHTML = '<span class="pill">' + text + '</span>';
+     quotaHintEl.classList.add('visible');
+     quotaHintEl.classList.toggle('low', remaining <= 3);
+   }
+ 
+   function clearEmptyState() {
+-    if (emptyStateEl && emptyStateEl.parentNode) {
+-      emptyStateEl.parentNode.removeChild(emptyStateEl);
++    // Looked up fresh each time (rather than cached once) since "Clear chat"
++    // re-creates a brand new empty-state element with the same id.
++    const el = document.getElementById('empty-state');
++    if (el && el.parentNode) {
++      el.parentNode.removeChild(el);
+     }
+   }
+ 
+@@ -434,13 +562,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+   function addQuotaExceededMessage(text) {
+     clearEmptyState();
+     const div = document.createElement('div');
+-    div.className = 'msg assistant';
++    div.className = 'msg assistant quota-card';
+     const p = document.createElement('div');
+     p.textContent = text;
+     div.appendChild(p);
+     const btn = document.createElement('button');
++    btn.className = 'btn-accent';
+     btn.textContent = 'Set my Groq API key';
+-    btn.style.marginTop = '8px';
+     btn.addEventListener('click', () => vscode.postMessage({ type: 'setKey' }));
+     div.appendChild(btn);
+     messagesEl.appendChild(div);
+@@ -454,7 +582,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+     thinkingEl = addMessage('Thinking...', 'assistant thinking');
+     vscode.postMessage({ type: 'ask', text });
+     questionEl.value = '';
++    autoGrow();
++  }
++
++  function autoGrow() {
++    questionEl.style.height = 'auto';
++    questionEl.style.height = Math.min(questionEl.scrollHeight, 120) + 'px';
+   }
++  questionEl.addEventListener('input', autoGrow);
+ 
+   sendBtn.addEventListener('click', send);
+   questionEl.addEventListener('keydown', (e) => {
+@@ -465,12 +600,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
+   });
+ 
+   clearBtn.addEventListener('click', () => {
+-    messagesEl.innerHTML = '';
+-    const empty = document.createElement('div');
+-    empty.className = 'empty-state';
+-    empty.id = 'empty-state';
+-    empty.textContent = 'Ask a question about this project.';
+-    messagesEl.appendChild(empty);
++    messagesEl.innerHTML = EMPTY_STATE_HTML;
+     vscode.postMessage({ type: 'clearHistory' });
+   });
+ 

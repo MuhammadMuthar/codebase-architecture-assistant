@@ -9,3 +9,9 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+out/test/**
+out/unit-tests/**
+*.patch
+proxy/**
+package-lock.json
+media/icon-marketplace.svg

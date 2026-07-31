@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ProjectMap } from './types';
+import { buildCompactText } from './dependencyGraph';
 
 const MODEL = 'openai/gpt-oss-120b';
 
@@ -686,14 +687,21 @@ function buildContextString(map: ProjectMap): string {
     .map(s => `- ${s.path}: ${s.role} (${s.fileCount} files, e.g. ${s.sampleFiles.join(', ') || 'n/a'})`)
     .join('\n');
 
+  const depLines = (map.dependencies.edges.length === 0 && map.dependencies.parsedFileCount === 0)
+    ? '(no TS/JS files were parsed - import-graph skipped)'
+    : buildCompactText(map.dependencies);
+
   return [
     `Project root: ${map.root}`,
     `Languages: ${languages.join(', ') || 'unknown'}`,
     `Frameworks: ${frameworks.join(', ') || 'none detected'}`,
     `Package managers: ${packageManagers.join(', ') || 'unknown'}`,
     `Total files: ${map.totalFiles}`,
+    `Parsed ${map.dependencies.parsedFileCount} TS/JS files for module dependencies`,
     'Folder structure:',
-    structureLines || '(no recognized folders mapped)'
+    structureLines || '(no recognized folders mapped)',
+    'Module dependencies (top-level folder clusters):',
+    depLines
   ].join('\n');
 }
 

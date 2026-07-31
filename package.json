@@ -1,6 +1,6 @@
 {
   "name": "codebase-architecture-assistant",
-  "displayName": "codebase-architecture-assistant",
+  "displayName": "Codebase Assistant",
   "description": "An AI-powered developer assistant that understands an entire project automatically and answers architecture questions without the developer having to explain the codebase.",
   "version": "0.0.1",
   "publisher": "muhammad-muthar",

@@ -264,6 +264,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
+  :root {
+    --accent: #E8A33D;
+  }
+  * {
+    box-sizing: border-box;
+  }
   body {
     font-family: var(--vscode-font-family);
     color: var(--vscode-foreground);
@@ -273,66 +279,159 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    box-sizing: border-box;
+    font-size: 13px;
+  }
+  #app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
+  }
+  #brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+  #brand-mark {
+    width: 15px;
+    height: 15px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  #brand-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    opacity: 0.82;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    color: var(--vscode-descriptionForeground);
+    border: none;
+    border-radius: 5px;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover {
+    background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+    color: var(--vscode-foreground);
   }
   #messages {
     flex: 1;
     overflow-y: auto;
-    padding: 12px;
+    padding: 14px 12px;
   }
   .msg {
-    margin-bottom: 12px;
-    padding: 8px 10px;
-    border-radius: 6px;
+    margin-bottom: 16px;
     font-size: 13px;
-    line-height: 1.4;
+    line-height: 1.55;
     white-space: pre-wrap;
+    max-width: 94%;
   }
   .msg.user {
-    background-color: var(--vscode-badge-background);
-    color: var(--vscode-badge-foreground);
+    margin-left: auto;
+    background-color: var(--vscode-list-inactiveSelectionBackground, var(--vscode-editorWidget-background));
+    color: var(--vscode-foreground);
+    padding: 7px 11px;
+    border-radius: 10px 10px 2px 10px;
   }
   .msg.assistant {
-    background-color: var(--vscode-editorWidget-background);
-    border: 1px solid var(--vscode-widget-border, transparent);
+    border-left: 2px solid var(--accent);
+    padding: 1px 0 1px 12px;
   }
   .msg.thinking {
     color: var(--vscode-descriptionForeground);
     font-style: italic;
+    border-left-color: var(--vscode-panel-border);
+  }
+  .quota-card {
+    background: var(--vscode-editorWidget-background);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 12px;
   }
   .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
     color: var(--vscode-descriptionForeground);
-    padding: 16px 12px;
-    font-size: 13px;
+    padding: 44px 24px;
+  }
+  #empty-mark {
+    width: 30px;
+    height: 30px;
+    color: var(--accent);
+    opacity: 0.9;
   }
   #input-row {
     display: flex;
+    align-items: flex-end;
     gap: 6px;
-    padding: 8px;
+    padding: 8px 10px;
     border-top: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
   }
   #question {
     flex: 1;
     background-color: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, transparent);
-    border-radius: 4px;
-    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 7px 10px;
     font-family: inherit;
     font-size: 13px;
     resize: none;
+    min-height: 32px;
+    max-height: 120px;
+    overflow-y: auto;
+    transition: border-color 0.12s ease;
   }
-  button {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+  #question:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  #send {
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    color: #1B1E24;
+    border-radius: 8px;
+  }
+  #send:hover {
+    background: #F0AE52;
+    color: #1B1E24;
+  }
+  #send:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .btn-accent {
+    background: var(--accent);
+    color: #1B1E24;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 6px 12px;
-    font-size: 13px;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
+    margin-top: 8px;
   }
-  button:hover {
-    background-color: var(--vscode-button-hoverBackground);
+  .btn-accent:hover {
+    background: #F0AE52;
   }
   /* Markdown Tables */
   .msg table {
@@ -372,70 +471,99 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
   #quota-hint {
     display: none;
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    padding: 4px 8px 0 8px;
     text-align: right;
+    padding: 0 10px;
   }
   #quota-hint.visible {
     display: block;
   }
-  #quota-hint.low {
-    color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
-  }  #header-row {
-    display: flex;
-    justify-content: flex-end;
-    padding: 6px 8px 0 8px;
-  }
-  #header-row button {
-    background: transparent;
+  #quota-hint .pill {
+    display: inline-block;
+    font-size: 10.5px;
     color: var(--vscode-descriptionForeground);
-    border: 1px solid var(--vscode-panel-border);
-    padding: 2px 8px;
-    font-size: 11px;
+    background: var(--vscode-badge-background, rgba(127,127,127,0.15));
+    padding: 2px 9px;
+    border-radius: 9px;
+    margin-bottom: 6px;
   }
-  #header-row button:hover {
-    background: var(--vscode-toolbar-hoverBackground, var(--vscode-editorWidget-background));
-    color: var(--vscode-foreground);
+  #quota-hint.low .pill {
+    color: var(--accent);
   }
 </style>
 </head>
 <body>
-<div id="header-row">
-  <button id="clear" title="Clear chat history">Clear chat</button>
-</div>
+<header id="app-header">
+  <div id="brand">
+    <svg id="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M21 7V4.5A1.5 1.5 0 0 0 19.5 3H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3 17v2.5A1.5 1.5 0 0 0 4.5 21H7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M21 17v2.5a1.5 1.5 0 0 1-1.5 1.5H17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 9.8L8.4 14.6M12 9.8l3.6 4.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="12" cy="8.4" r="1.7" fill="currentColor"/>
+      <circle cx="8" cy="15.8" r="1.7" fill="currentColor"/>
+      <circle cx="16" cy="15.8" r="1.7" fill="currentColor"/>
+    </svg>
+    <span id="brand-label">Codebase Assistant</span>
+  </div>
+  <button id="clear" class="icon-btn" title="Clear chat" aria-label="Clear chat">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M3 4.5h10M6.5 4.5V2.8a.8.8 0 0 1 .8-.8h1.4a.8.8 0 0 1 .8.8v1.7M4.6 4.5l.6 8.8c.03.5.45.9.95.9h3.7c.5 0 .92-.4.95-.9l.6-8.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</header>
 <div id="messages">
-  <div class="empty-state" id="empty-state">Ask a question about this project.</div>
+  <div class="empty-state" id="empty-state">
+    <svg id="empty-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M21 7V4.5A1.5 1.5 0 0 0 19.5 3H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3 17v2.5A1.5 1.5 0 0 0 4.5 21H7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M21 17v2.5a1.5 1.5 0 0 1-1.5 1.5H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 9.8L8.4 14.6M12 9.8l3.6 4.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      <circle cx="12" cy="8.4" r="1.6" fill="currentColor"/>
+      <circle cx="8" cy="15.8" r="1.6" fill="currentColor"/>
+      <circle cx="16" cy="15.8" r="1.6" fill="currentColor"/>
+    </svg>
+    <p style="margin: 0;">Ask a question about this project's structure, stack, or code.</p>
+  </div>
 </div>
 <div id="quota-hint"></div>
 <div id="input-row">
-  <textarea id="question" rows="2" placeholder="Ask about this codebase..."></textarea>
-  <button id="send">Send</button>
+  <textarea id="question" rows="1" placeholder="Ask about this codebase…"></textarea>
+  <button id="send" class="icon-btn" title="Send" aria-label="Send message">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2 8L13.5 2.2a.5.5 0 0 1 .7.6L11 13.5a.5.5 0 0 1-.94.05L7 8l-4.7-.3a.4.4 0 0 1-.3-.7z" fill="currentColor"/>
+    </svg>
+  </button>
 </div>
 <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
   const messagesEl = document.getElementById('messages');
+  const EMPTY_STATE_HTML = messagesEl.innerHTML;
   const questionEl = document.getElementById('question');
   const sendBtn = document.getElementById('send');
   const clearBtn = document.getElementById('clear');
-  const emptyStateEl = document.getElementById('empty-state');
   const quotaHintEl = document.getElementById('quota-hint');
   let thinkingEl = null;
 
   function updateQuotaHint(remaining) {
     if (typeof remaining !== 'number') return;
-    quotaHintEl.textContent = remaining === 0
-      ? 'No free questions left - set your own Groq API key to continue.'
+    const text = remaining === 0
+      ? 'No free questions left — set your own Groq API key to continue'
       : remaining + ' free question' + (remaining === 1 ? '' : 's') + ' remaining';
+    quotaHintEl.innerHTML = '<span class="pill">' + text + '</span>';
     quotaHintEl.classList.add('visible');
     quotaHintEl.classList.toggle('low', remaining <= 3);
   }
 
   function clearEmptyState() {
-    if (emptyStateEl && emptyStateEl.parentNode) {
-      emptyStateEl.parentNode.removeChild(emptyStateEl);
+    // Looked up fresh each time (rather than cached once) since "Clear chat"
+    // re-creates a brand new empty-state element with the same id.
+    const el = document.getElementById('empty-state');
+    if (el && el.parentNode) {
+      el.parentNode.removeChild(el);
     }
   }
 
@@ -458,13 +586,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   function addQuotaExceededMessage(text) {
     clearEmptyState();
     const div = document.createElement('div');
-    div.className = 'msg assistant';
+    div.className = 'msg assistant quota-card';
     const p = document.createElement('div');
     p.textContent = text;
     div.appendChild(p);
     const btn = document.createElement('button');
+    btn.className = 'btn-accent';
     btn.textContent = 'Set my Groq API key';
-    btn.style.marginTop = '8px';
     btn.addEventListener('click', () => vscode.postMessage({ type: 'setKey' }));
     div.appendChild(btn);
     messagesEl.appendChild(div);
@@ -478,7 +606,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     thinkingEl = addMessage('Thinking...', 'assistant thinking');
     vscode.postMessage({ type: 'ask', text });
     questionEl.value = '';
+    autoGrow();
   }
+
+  function autoGrow() {
+    questionEl.style.height = 'auto';
+    questionEl.style.height = Math.min(questionEl.scrollHeight, 120) + 'px';
+  }
+  questionEl.addEventListener('input', autoGrow);
 
   sendBtn.addEventListener('click', send);
   questionEl.addEventListener('keydown', (e) => {
@@ -489,12 +624,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   });
 
   clearBtn.addEventListener('click', () => {
-    messagesEl.innerHTML = '';
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.id = 'empty-state';
-    empty.textContent = 'Ask a question about this project.';
-    messagesEl.appendChild(empty);
+    messagesEl.innerHTML = EMPTY_STATE_HTML;
     vscode.postMessage({ type: 'clearHistory' });
   });
 

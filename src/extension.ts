@@ -24,13 +24,36 @@ function buildProjectMap(rootPath: string): ProjectMap {
   return { root: rootPath, stack, structure, fileTree: tree, totalFiles: allFiles.length };
 }
 
-export function activate(context: vscode.ExtensionContext) {
+async function scanWorkspace(): Promise<void> {
   const folders = vscode.workspace.workspaceFolders;
-  if (folders && folders.length > 0) {
-    const rootPath = folders[0].uri.fsPath;
-    cachedMap = buildProjectMap(rootPath);
-    console.log('Project map built:', cachedMap.stack);
+  if (!folders || folders.length === 0) {
+    cachedMap = undefined;
+    return;
   }
+
+  const rootPath = folders[0].uri.fsPath;
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Window,
+      title: 'Codebase Assistant: scanning project...'
+    },
+    async () => {
+      cachedMap = buildProjectMap(rootPath);
+      console.log('Project map built:', cachedMap.stack);
+    }
+  );
+}
+
+export function activate(context: vscode.ExtensionContext) {
+  // Fire-and-forget: don't block activate() on a potentially large scan.
+  // Anything that reads cachedMap already handles the "not ready yet" case.
+  void scanWorkspace();
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      void scanWorkspace();
+    })
+  );
 
   const chatProvider = new ChatViewProvider(
     context.extensionUri,

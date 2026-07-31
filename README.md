@@ -89,12 +89,16 @@ npm test             # full VS Code integration test (launches a real editor ins
 - Stack detection covers common ecosystems (Node/npm, Python/pip, plain
   HTML/CSS/JS) but isn't exhaustive — some manifest types (Ruby, Swift,
   .NET, etc.) aren't recognized yet.
-- Each chat question is currently stateless to the model — the AI doesn't
-  see earlier questions in the same conversation as context, only the
-  project map.
+- The project map is rebuilt automatically if you switch workspace folders,
+  but large structural changes made while staying in the same folder (new
+  top-level directories, a newly-added package manager) aren't picked up
+  until you reload the window.
 - The free-tier quota is tied to VS Code's machine ID, which can reset if
   the whole VS Code installation is wiped (not just the extension).
+- Very large workspaces are scanned up to an internal file cap, so the
+  project map may reflect a partial (but still representative) view of the
+  tree rather than every single file.
 
 ## License
 
-Not yet specified.
+MIT — see [LICENSE](./LICENSE).

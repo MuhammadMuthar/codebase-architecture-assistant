@@ -2,7 +2,7 @@
   "name": "codebase-architecture-assistant",
   "displayName": "Codebase Assistant",
   "description": "An AI-powered developer assistant that understands an entire project automatically and answers architecture questions without the developer having to explain the codebase.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "muhammad-muthar",
   "icon": "media/icon.png",
   "repository": {
@@ -15,6 +15,15 @@
   },
   "categories": [
     "AI"
+  ],
+  "keywords": [
+    "ai",
+    "architecture",
+    "codebase",
+    "chat",
+    "groq",
+    "onboarding",
+    "documentation"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",

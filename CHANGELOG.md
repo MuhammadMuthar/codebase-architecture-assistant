@@ -6,6 +6,25 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+- New command: **Codebase Assistant: Show Architecture Diagram** —
+  renders the project's inter-module dependency graph as an interactive
+  Mermaid `flowchart` in a webview. Edges are labelled with import
+  counts; cycles are collapsed into a single annotated node; bare imports
+  collapse to a single `(external)` pseudo-node. A filter input dims
+  non-matching nodes for quick scanning.
+- The project map now includes a real inter-module **dependency graph**
+  built by parsing TS/JS imports and requires (regex-based, no new
+  dependencies). The chat system prompt includes a compact summary of
+  the graph, so answers can refer to actual call chains
+  (e.g. "routes/orders.ts imports services/orderService.ts, which
+  imports db/prisma.ts") instead of generic folder-role guesses.
+- Files >200 KB are skipped from the import-graph pass (counted in
+  `skippedFileCount`) with one warning per file. Hard ceiling on
+  warnings per graph (20) to avoid flooding the chat.
+- Known v1 limitations: TS path aliases (e.g. `@/foo` via
+  `tsconfig.json` `compilerOptions.paths`) and dynamic `import('foo')`
+  expressions are not resolved. Python, Go, Rust, and other non-TS/JS
+  imports are silently skipped. Both are documented as future work.
 - The system prompt now explicitly restricts the assistant to programming
   and codebase topics, with a fixed decline message for out-of-scope
   questions (e.g. medical, financial, or general life advice). Applies to

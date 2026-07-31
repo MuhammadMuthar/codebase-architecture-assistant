@@ -53,6 +53,7 @@ run **"Codebase Assistant: Clear Groq API Key"** from the Command Palette.
 | `Codebase Assistant: Set Groq API Key` | Save your own Groq API key (leave the prompt empty to keep whatever key is already saved) |
 | `Codebase Assistant: Clear Groq API Key` | Remove your saved key and switch back to the free-tier proxy |
 | `Show Project Map` | Quick popup summary of detected stack + file count |
+| `Codebase Assistant: Show Architecture Diagram` | Open an interactive Mermaid diagram of the project's TS/JS import graph in a webview |
 
 ## How the free tier works (for the curious / cautious)
 
@@ -86,6 +87,14 @@ npm test             # full VS Code integration test (launches a real editor ins
 
 ## Known limitations
 
+- **Import-graph parser is regex-based and TS/JS-only.** It does not
+  parse TypeScript path aliases (`@/foo` via `tsconfig.json` `paths`),
+  dynamic `import('foo')` expressions, or imports in other languages
+  (Python, Go, Rust). These are documented in `CHANGELOG.md` as future
+  work.
+- Files larger than 200 KB are skipped from the import-graph pass and
+  counted in a `skippedFileCount` warning. Imports in those files are
+  not represented.
 - Stack detection covers common ecosystems (Node/npm, Python/pip, plain
   HTML/CSS/JS) but isn't exhaustive — some manifest types (Ruby, Swift,
   .NET, etc.) aren't recognized yet.

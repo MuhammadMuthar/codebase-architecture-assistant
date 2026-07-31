@@ -2,8 +2,10 @@ import * as vscode from 'vscode';
 import { scanDirectory, flattenFiles } from './scanner';
 import { detectStack } from './stackDetector';
 import { mapStructure } from './structureMapper';
+import { buildDependencyGraph } from './dependencyGraph';
 import { ProjectMap } from './types';
 import { ChatViewProvider } from './chatViewProvider';
+import { DiagramViewProvider } from './diagramViewProvider';
 
 let cachedMap: ProjectMap | undefined;
 
@@ -21,7 +23,15 @@ function buildProjectMap(rootPath: string): ProjectMap {
   const allFiles = flattenFiles(tree);
   const stack = detectStack(rootPath, allFiles);
   const structure = mapStructure(tree);
-  return { root: rootPath, stack, structure, fileTree: tree, totalFiles: allFiles.length };
+  const dependencies = buildDependencyGraph(rootPath, tree);
+  return {
+    root: rootPath,
+    stack,
+    structure,
+    fileTree: tree,
+    totalFiles: allFiles.length,
+    dependencies
+  };
 }
 
 async function scanWorkspace(): Promise<void> {
@@ -67,6 +77,11 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatProvider, {
       webviewOptions: { retainContextWhenHidden: true }
     })
+  );
+
+  const diagramProvider = new DiagramViewProvider(
+    context.extensionUri,
+    () => cachedMap
   );
 
   const setKeyDisposable = vscode.commands.registerCommand(
@@ -131,6 +146,14 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(disposable);
+
+  const diagramDisposable = vscode.commands.registerCommand(
+    'codebase-architecture-assistant.showArchitectureDiagram',
+    () => {
+      diagramProvider.show();
+    }
+  );
+  context.subscriptions.push(diagramDisposable);
 
   const askAboutFileDisposable = vscode.commands.registerCommand(
     'codebase-architecture-assistant.askAboutFile',

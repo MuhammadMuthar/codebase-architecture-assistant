@@ -786,7 +786,10 @@ async function askGroq(messages: ConversationMessage[], map: ProjectMap, apiKey:
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 800,
+      // 4096 leaves headroom for dense answers with code/tables after the
+      // graph-aware system prompt takes its share of the context window.
+      // 800 was too tight and produced mid-sentence truncations.
+      max_tokens: 4096,
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages

@@ -6,7 +6,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-- Initial release
+- The system prompt now explicitly restricts the assistant to programming
+  and codebase topics, with a fixed decline message for out-of-scope
+  questions (e.g. medical, financial, or general life advice). Applies to
+  both the free-tier proxy path and BYO API key path, and to the
+  "Explain File"/"Explain Selection" commands, since they all share the
+  same prompt builder.
 
 ## [0.0.2]
 

@@ -32,6 +32,19 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
   "Explain File"/"Explain Selection" commands, since they all share the
   same prompt builder.
 
+## [1.0.4] - 2026-08-07
+
+- **Empty-state now has a "Set my Groq API key" button.** First-time
+  visitors no longer need the Command Palette or a quota-exhaustion
+  detour to configure their key. The button lives inline under the
+  welcome message and is hidden once the user sends their first
+  message.
+- Tightened markdown spacing in chat messages (h1-h4 margins
+  12/6 → 10/4, 1.3 line-height, zero top-margin on first heading,
+  explicit margins for p/pre/li/blockquote/hr; slimmer ul/ol and li
+  spacing; blockquote styled with left border + descriptionForeground).
+- Raised chat-completion cap from 800 to 4096 tokens.
+
 ## [0.0.2]
 
 - Removed stray compiled `.js`/`.js.map` files and leftover `.patch` files

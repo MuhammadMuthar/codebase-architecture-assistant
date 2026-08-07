@@ -452,8 +452,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /* Headings & Code */
   .msg h1, .msg h2, .msg h3, .msg h4 {
-    margin: 12px 0 6px 0;
+    margin: 10px 0 4px 0;
+    line-height: 1.3;
     color: var(--vscode-foreground);
+  }
+  .msg h1:first-child, .msg h2:first-child, .msg h3:first-child, .msg h4:first-child {
+    margin-top: 0;
+  }
+  .msg p {
+    margin: 4px 0;
   }
   .msg code {
     background: var(--vscode-textCodeBlock-background);
@@ -461,14 +468,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     padding: 2px 4px;
     border-radius: 3px;
   }
+  .msg pre {
+    margin: 6px 0;
+  }
   .msg pre code {
     display: block;
     padding: 8px;
     overflow-x: auto;
   }
   .msg ul, .msg ol {
-    margin: 6px 0;
+    margin: 4px 0;
     padding-left: 20px;
+  }
+  .msg li {
+    margin: 1px 0;
+  }
+  .msg li > ul, .msg li > ol {
+    margin: 1px 0;
+  }
+  .msg li p {
+    margin: 2px 0;
+  }
+  .msg blockquote {
+    margin: 4px 0;
+    padding-left: 10px;
+    border-left: 2px solid var(--vscode-panel-border);
+    color: var(--vscode-descriptionForeground);
+  }
+  .msg hr {
+    margin: 8px 0;
+    border: none;
+    border-top: 1px solid var(--vscode-panel-border);
   }
   #quota-hint {
     display: none;

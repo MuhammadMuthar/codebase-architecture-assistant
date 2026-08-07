@@ -378,6 +378,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     color: var(--accent);
     opacity: 0.9;
   }
+  #empty-set-key {
+    margin-top: 4px;
+  }
   #input-row {
     display: flex;
     align-items: flex-end;
@@ -556,6 +559,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       <circle cx="16" cy="15.8" r="1.6" fill="currentColor"/>
     </svg>
     <p style="margin: 0;">Ask a question about this project's structure, stack, or code.</p>
+    <button id="empty-set-key" class="btn-accent" type="button">Set my Groq API key</button>
   </div>
 </div>
 <div id="quota-hint"></div>
@@ -657,6 +661,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   clearBtn.addEventListener('click', () => {
     messagesEl.innerHTML = EMPTY_STATE_HTML;
     vscode.postMessage({ type: 'clearHistory' });
+  });
+
+  // Delegated (not bound directly to the button) because "Clear chat" replaces
+  // #empty-state's markup via innerHTML, which would otherwise drop a direct listener.
+  messagesEl.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'empty-set-key') {
+      vscode.postMessage({ type: 'setKey' });
+    }
   });
 
   function restoreHistory(history) {
